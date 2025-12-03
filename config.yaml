@@ -1,0 +1,31 @@
+project:
+  mode: release
+  name: detectionx
+  version: 1.0.0
+  describe: ""
+
+detection:
+  threshold: 0.65
+  classes:
+
+mqtt:
+  enable: false
+  ip: 192.168.1.188
+  port: 11058
+  interval: 500 # ms
+  notify_topic: /perception/detectionx/results
+
+rtsp:
+  port: 16888
+  width: 1280
+  height: 720
+  suffix: detectionx
+
+tasks:
+  - id: cam00001
+    uri: /dev/video2
+    region:
+
+  - id: cam00002
+    uri: /dev/video2
+    region:

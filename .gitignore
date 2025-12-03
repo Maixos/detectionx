@@ -1,0 +1,15 @@
+.idea
+.vscode
+
+__pycache__
+
+#lib
+logs
+bins
+runs
+asset
+build
+install
+release
+results
+cmake-build-debug
