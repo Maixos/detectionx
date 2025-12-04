@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
     ///                 CONFIG
     /// ----------------------------------------
     GConfig &g_config = GConfig::get_instance();
-    if (!g_config.load("/home/firefly/coder/projs/Maixos/detectionx/release/config.yaml")) {
+    if (!g_config.load("config.yaml")) {
         LOG_ERROR("test", "load config.yaml failed");
         return -1;
     }
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     ///                 RTSP
     /// ----------------------------------------
     const auto rtsp_server = rtspx::RtspServer::create();
-    if (!rtsp_server->start("0.0.0.0", 8554)) {
+    if (!rtsp_server->start("0.0.0.0", g_config.rtsp_config_.port)) {
         LOG_ERROR("test", "start rtsp server failed");
         return -1;
     }
