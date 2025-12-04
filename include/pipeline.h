@@ -21,7 +21,7 @@ namespace detectionx {
         void stop();
 
     private:
-        void on_frame(const std::shared_ptr<vcodecx::FrameX> &framex) const;
+        void process() const;
 
         void on_encoded(const std::shared_ptr<vcodecx::EncodedX> &encodedx) const;
 
@@ -30,6 +30,7 @@ namespace detectionx {
 
         std::atomic<bool> stopped_{false};
 
+        std::thread processor_{};
         std::shared_ptr<vcodecx::Decoder> decoder_;
         std::shared_ptr<vcodecx::Encoder> encoder_;
         std::shared_ptr<vcodecx::Manager> codec_manager_;
