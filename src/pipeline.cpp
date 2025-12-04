@@ -1,11 +1,13 @@
 #include "pipeline.h"
 
+#include <opencv2/opencv.hpp>
+
 #include "toolkitx/logx/logx.h"
 
 namespace detectionx {
     Pipeline::Pipeline(
-        TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
-        const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
+            TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
+            const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
     ) : task_config_(std::move(task_config)), codec_manager_(codec_manager), mqtt_client_(mqtt_client),
         session_(session) {
         GConfig &g_config = GConfig::get_instance();
@@ -16,7 +18,7 @@ namespace detectionx {
 
         const vcodecx::StreamInfo stream_info{task_config_.id, task_config_.uri};
         const vcodecx::DecodeConfig decode_cfg{
-            width, height, vcodecx::ImageFormat::NV12, vcodecx::WorkerMode::Callback, fps, 3
+                width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 3
         };
         decoder_ = codec_manager->create_decoder(stream_info, decode_cfg);
         if (!decoder_) {
@@ -25,7 +27,7 @@ namespace detectionx {
         }
 
         vcodecx::EncodeConfig encode_cfg{
-            width, height, vcodecx::WorkerMode::Callback, fps, 3, vcodecx::CodecType::H265
+                width, height, vcodecx::WorkerMode::Callback, fps, 3, vcodecx::CodecType::H265
         };
         encoder_ = codec_manager->create_encoder(encode_cfg);
         if (!decoder_) {
@@ -33,8 +35,9 @@ namespace detectionx {
             return;
         }
 
-        decoder_->subscribe([this](const auto &f) { on_frame(f); });
         encoder_->subscribe([this](const auto &e) { on_encoded(e); });
+
+        processor_ = std::thread(&Pipeline::process, this);
     }
 
     Pipeline::~Pipeline() {
@@ -43,13 +46,23 @@ namespace detectionx {
 
     void Pipeline::stop() {
         if (stopped_.exchange(true)) return;
+
+        if (processor_.joinable()) {
+            processor_.join();
+        }
+
         if (decoder_) decoder_->release();
         if (encoder_) encoder_->release();
         LOG_INFO("pipeline", "task pipeline %s stopped", task_config_.id.c_str());
     }
 
-    void Pipeline::on_frame(const std::shared_ptr<vcodecx::FrameX> &framex) const {
-        encoder_->write(framex, 5);
+    void Pipeline::process() const {
+        while (!stopped_ && !decoder_->is_released()) {
+            std::shared_ptr<vcodecx::FrameX> framex;
+            if (decoder_->read(framex, 10)) {
+                encoder_->write(framex, 3);
+            }
+        }
     }
 
     void Pipeline::on_encoded(const std::shared_ptr<vcodecx::EncodedX> &encodedx) const {
