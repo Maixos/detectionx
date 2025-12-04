@@ -11,7 +11,7 @@ detection:
 mqtt:
   enable: false
   ip: 192.168.1.188
-  port: 11058
+  port: 1883
   interval: 500 # ms
   notify_topic: /perception/detectionx/results
 
@@ -23,7 +23,7 @@ rtsp:
 
 tasks:
   - id: cam00001
-    uri: /dev/video2
+    uri: /dev/video1
     region:
 
   - id: cam00002
