@@ -2,19 +2,47 @@
 
 #include <opencv2/opencv.hpp>
 
-#include "toolkitx/logx/logx.h"
+#include <toolkitx/logx/logx.h>
 
 namespace detectionx {
     Pipeline::Pipeline(
-            TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
+            TaskConfig cfg, const std::shared_ptr<vcodecx::Manager> &codec_manager,
             const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
-    ) : task_config_(std::move(task_config)), codec_manager_(codec_manager), mqtt_client_(mqtt_client),
+    ) : task_config_(std::move(cfg)), codec_manager_(codec_manager), mqtt_client_(mqtt_client),
         session_(session) {
         GConfig &g_config = GConfig::get_instance();
 
         int fps = 30;
         int width = g_config.rtsp_config_.width;
         int height = g_config.rtsp_config_.height;
+
+        region_ = vision::Region(cv::Rect(0, 0, width, height), width, height);
+
+        if (task_config_.type == "xyxy") {
+            if (task_config_.values.size() == 4) {
+                int x1 = task_config_.values[0];
+                int y1 = task_config_.values[1];
+                int x2 = task_config_.values[2];
+                int y2 = task_config_.values[3];
+                cv::Rect rect(x1, y1, x2 - x1, y2 - y1);
+                region_ = vision::Region(rect, width, height);
+            } else {
+                LOG_WARN("pipeline", "xyxy region requires 4 floats but got %zu", task_config_.values.size());
+            }
+        } else if (task_config_.type == "polygon") {
+            if (task_config_.values.size() % 2 == 0 && !task_config_.values.empty()) {
+                std::vector<cv::Point2f> pts;
+                pts.reserve(task_config_.values.size() / 2);
+
+                for (size_t i = 0; i < task_config_.values.size(); i += 2) {
+                    pts.emplace_back(task_config_.values[i], task_config_.values[i + 1]);
+                }
+
+                region_ = vision::Region(pts, width, height);
+            } else {
+                LOG_WARN("pipeline", "polygon region requires N pairs but got %zu", cfg.values.size());
+            }
+        }
 
         const vcodecx::StreamInfo stream_info{task_config_.id, task_config_.uri};
         const vcodecx::DecodeConfig decode_cfg{

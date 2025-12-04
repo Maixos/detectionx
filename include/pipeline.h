@@ -1,8 +1,9 @@
 #pragma once
 
-#include "rtspx/rtspx.h"
-#include "vcodecx/manager.h"
-#include "mqttx/mqttx_client.h"
+#include <rtspx/rtspx.h>
+#include <vcodecx/manager.h>
+#include <mqttx/mqttx_client.h>
+#include <toolkitx/vision/region.h>
 
 #include "config.h"
 
@@ -12,8 +13,8 @@ namespace detectionx {
         Pipeline() = default;
 
         Pipeline(
-            TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
-            const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
+                TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
+                const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
         );
 
         ~Pipeline();
@@ -28,6 +29,7 @@ namespace detectionx {
     private:
         TaskConfig task_config_{};
 
+        vision::Region region_{};
         std::atomic<bool> stopped_{false};
 
         std::thread processor_{};

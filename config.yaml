@@ -25,7 +25,14 @@ tasks:
   - id: cam00001
     uri: /dev/video1
     region:
+      type: xyxy
+      xyxy: [ 100, 100, 200, 300 ]
 
   - id: cam00002
     uri: /dev/video2
     region:
+      type: polygon
+      polygon:
+        - [ 100, 100 ]
+        - [ 300, 100 ]
+        - [ 350, 300 ]

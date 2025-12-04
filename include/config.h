@@ -112,12 +112,13 @@ namespace detectionx {
     struct TaskConfig {
         std::string id;
         std::string uri;
-        std::vector<float> region;
+        std::string type;
+        std::vector<int> values;
 
         TaskConfig() = default;
 
-        TaskConfig(std::string id, std::string uri, const std::vector<float> &region)
-            : id(std::move(id)), uri(std::move(uri)), region(region) {
+        TaskConfig(std::string id, std::string uri, std::string type, const std::vector<int> &values)
+            : id(std::move(id)), uri(std::move(uri)), type(std::move(type)), values(values) {
         }
 
         [[nodiscard]] std::string to_string() const {
@@ -125,11 +126,12 @@ namespace detectionx {
             oss << "TaskConfig { "
                     << "id: " << id
                     << ", uri: " << uri
-                    << ", region: [";
+                    << ", type: " << type
+                    << ", values: [";
 
-            for (size_t i = 0; i < region.size(); ++i) {
-                oss << region[i];
-                if (i + 1 < region.size()) oss << ", ";
+            for (size_t i = 0; i < values.size(); ++i) {
+                oss << values[i];
+                if (i + 1 < values.size()) oss << ", ";
             }
 
             oss << "] }";

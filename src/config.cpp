@@ -61,11 +61,31 @@ namespace detectionx {
 
     void GConfig::parse_tasks(const YAML::Node &node) {
         task_configs_.reserve(node.size());
+
         for (const auto &item: node) {
             auto id = item["id"].as<std::string>();
             auto uri = item["uri"].as<std::string>();
-            auto region = item["region"].as<std::vector<float> >(std::vector<float>{});
-            task_configs_.emplace_back(id, uri, region);
+
+            std::string type{};
+            std::vector<int> values{};
+            if (item["region"]) {
+                const auto &rnode = item["region"];
+
+                type = rnode["type"].as<std::string>();
+
+                if (type == "xyxy") {
+                    for (auto &v: rnode["xyxy"]) {
+                        values.push_back(v.as<int>());
+                    }
+                } else if (type == "polygon") {
+                    for (auto &pt: rnode["polygon"]) {
+                        values.push_back(pt[0].as<int>());
+                        values.push_back(pt[1].as<int>());
+                    }
+                }
+            }
+
+            task_configs_.emplace_back(id, uri, type, values);
         }
     }
 }
