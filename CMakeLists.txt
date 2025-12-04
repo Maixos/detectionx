@@ -38,7 +38,7 @@ include_directories(${PROJECT_NAME} ${PROJECT_SOURCE_DIR}/include ${X3RDPARTY_IN
 file(GLOB SRCS src/*.cpp)
 add_executable(${PROJECT_NAME} ${SRCS})
 
-target_link_libraries(${PROJECT_NAME} ${X3RDPARTY_LINK_LIBS})
+target_link_libraries(${PROJECT_NAME} pthread ${X3RDPARTY_LINK_LIBS})
 
 # ============================================================
 # Release packaging
