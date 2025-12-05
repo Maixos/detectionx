@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     ///                 PIPELINES
     /// ----------------------------------------
     std::vector<std::unique_ptr<Pipeline> > task_pipelines;
-    const auto codec_manager = vcodecx::Manager::create();
+    const auto codec_manager = vcodecx::Manager::instance();
     for (const auto &task_config: g_config.task_configs_) {
         LOG_INFO("test", "loaded task config: %s", task_config.to_string().c_str());
         const std::string suffix = g_config.rtsp_config_.suffix + "/" + task_config.id;

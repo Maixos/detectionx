@@ -41,7 +41,7 @@ add_executable(${PROJECT_NAME} ${SRCS})
 target_link_libraries(${PROJECT_NAME} pthread ${X3RDPARTY_LINK_LIBS})
 
 # ============================================================
-# Release packaging
+# Release
 # ============================================================
 set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/release)
 install(FILES ${PROJECT_SOURCE_DIR}/config.yaml DESTINATION ${RELEASE_DIR})

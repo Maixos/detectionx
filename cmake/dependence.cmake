@@ -1,10 +1,10 @@
 # ------------------------------------------------------------
-# System packages
+# System
 # ------------------------------------------------------------
 #find_package(PkgConfig REQUIRED)
 
 # ------------------------------------------------------------
-# X3RDPARTY packages
+# X3RDPARTY
 # ------------------------------------------------------------
 string(TOLOWER "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}" X3RDPARTY_TARGET_PLATFORM)
 
