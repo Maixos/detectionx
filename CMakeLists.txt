@@ -1,52 +1,55 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.16)
 
-project(detectionx LANGUAGES CXX)
+project(detectionx-project VERSION 1.0.0 LANGUAGES CXX)
 
 # ============================================================
-# Global build settings
+# Global build configuration
 # ============================================================
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Runtime paths (for dynamic libraries)
 set(CMAKE_BUILD_RPATH "$ORIGIN/lib")
 set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
-# Output directories
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bins)
+# Default build type
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type: Debug, Release, RelWithDebInfo" FORCE)
+endif ()
 
-# ============================================================
-# Runtime backend selection (RKNN / TRT / ORT)
-# ============================================================
-set(RUNTIME "rknn" CACHE STRING "Select inference backend")
-set_property(CACHE RUNTIME PROPERTY STRINGS rknn trt ort)
-
-message(STATUS "Selected backend: ${RUNTIME}")
+include(GNUInstallDirs)
 
 # ============================================================
 # Third-party / dependency management
 # ============================================================
-include(${PROJECT_SOURCE_DIR}/cmake/dependence.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/dependencies.cmake)
 
 # ============================================================
-# Executable
+# Output directories
 # ============================================================
-include_directories(${PROJECT_NAME} ${PROJECT_SOURCE_DIR}/include ${X3RDPARTY_INCLUDE_DIRS})
-
-file(GLOB SRCS src/*.cpp)
-add_executable(${PROJECT_NAME} ${SRCS})
-
-target_link_libraries(${PROJECT_NAME} pthread ${X3RDPARTY_LINK_LIBS})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib/${MAIXOS_ARCH})
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib/${MAIXOS_ARCH})
 
 # ============================================================
-# Release
+# Install layout policy
 # ============================================================
-set(RELEASE_DIR ${PROJECT_SOURCE_DIR}/release)
-install(FILES ${PROJECT_SOURCE_DIR}/config.yaml DESTINATION ${RELEASE_DIR})
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/bins/ DESTINATION ${RELEASE_DIR} USE_SOURCE_PERMISSIONS)
-#install(DIRECTORY ${PROJECT_SOURCE_DIR}/asset/images DESTINATION ${RELEASE_DIR})
-#install(DIRECTORY ${PROJECT_SOURCE_DIR}/asset/models DESTINATION ${RELEASE_DIR})
+set(CMAKE_INSTALL_PREFIX "${MAIXOS_ROOT}" CACHE PATH "Install prefix" FORCE)
 
-install(FILES ${X3RDPARTY_INSTALL_FILES} DESTINATION ${RELEASE_DIR}/lib)
+if (CMAKE_INSTALL_LIBDIR STREQUAL "lib")
+    set(CMAKE_INSTALL_LIBDIR "lib/${MAIXOS_ARCH}" CACHE PATH "Library install directory" FORCE)
+endif ()
+
+# ============================================================
+# Build library
+# ============================================================
+add_subdirectory(src)
+
+# ============================================================
+# Tests
+# ============================================================
+if (TARGET_PLATFORM STREQUAL "rk3588")
+    add_subdirectory(tests/rk3588)
+elseif (TARGET_PLATFORM STREQUAL "jetson")
+    add_subdirectory(tests/jetson)
+endif ()

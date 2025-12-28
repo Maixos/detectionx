@@ -10,7 +10,7 @@ detection:
 
 mqtt:
   enable: false
-  ip: 192.168.1.188
+  ip: localhost
   port: 1883
   interval: 500 # ms
   notify_topic: /perception/detectionx/results

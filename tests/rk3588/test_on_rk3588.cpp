@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     if (g_config.mqtt_config_.enable) {
         const auto ip = g_config.mqtt_config_.ip;
         const auto port = g_config.mqtt_config_.port;
-        mqttx_client = mqttx::create_mqtt_client(ip + ":" + port, g_config.project_config_.name);
+        mqttx_client = mqttx::Client::create(ip + ":" + port, g_config.project_config_.name);
         if (!mqttx_client) {
             LOG_ERROR(
                 "test", "MQTT connection failed. Please check your MQTT configuration: ip=%s, port=%s",

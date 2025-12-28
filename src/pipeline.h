@@ -1,8 +1,8 @@
 #pragma once
 
 #include <rtspx/rtspx.h>
+#include <mqttx/client.h>
 #include <vcodecx/manager.h>
-#include <mqttx/mqttx_client.h>
 #include <toolkitx/vision/region.h>
 
 #include "config.h"
