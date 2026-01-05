@@ -4,19 +4,25 @@
 #include <mqttx/client.h>
 #include <vcodecx/manager.h>
 #include <toolkitx/vision/region.h>
+#include <toolkitx/concurrent/queuex.h>
 #include <inferencex/engines/detection/yolo11.h>
 
 #include "config.h"
 
 namespace detectionx {
+    struct PendingDetection {
+        std::shared_ptr<vcodecx::FrameX> framex;
+        std::shared_future<inferencex::Detection2DResults> handle;
+    };
+
     class Pipeline {
     public:
         Pipeline() = default;
 
         Pipeline(
-                TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
-                const std::shared_ptr<inferencex::detection::YOLO11Engine> &detector,
-                const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
+            TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
+            const std::shared_ptr<inferencex::detection::YOLO11Engine> &detector,
+            const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
         );
 
         ~Pipeline();
@@ -24,7 +30,9 @@ namespace detectionx {
         void stop();
 
     private:
-        void process() const;
+        void producer() const;
+
+        void consumer() const;
 
         void on_encoded(const std::shared_ptr<vcodecx::EncodedX> &encodedx) const;
 
@@ -34,11 +42,13 @@ namespace detectionx {
         vision::Region region_{};
         std::atomic<bool> stopped_{false};
 
-        std::thread processor_{};
+        std::thread producer_{};
+        std::thread consumer_{};
         std::shared_ptr<vcodecx::Decoder> decoder_{};
         std::shared_ptr<vcodecx::Encoder> encoder_{};
         std::shared_ptr<vcodecx::Manager> codec_manager_{};
         std::shared_ptr<inferencex::detection::YOLO11Engine> detector_{};
+        std::shared_ptr<toolkitx::concurrent::BlockingQueue<PendingDetection> > pending_detections_{};
 
         std::shared_ptr<mqttx::Client> mqtt_client_{};
         std::shared_ptr<rtspx::MediaSession> session_{};

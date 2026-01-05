@@ -6,16 +6,18 @@
 
 namespace detectionx {
     Pipeline::Pipeline(
-            TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
-            const std::shared_ptr<inferencex::detection::YOLO11Engine> &detector,
-            const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
+        TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
+        const std::shared_ptr<inferencex::detection::YOLO11Engine> &detector,
+        const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
     ) : task_config_(std::move(task_config)), codec_manager_(codec_manager), detector_(detector),
-        mqtt_client_(mqtt_client),session_(session) {
+        mqtt_client_(mqtt_client), session_(session) {
         const GConfig &g_config = GConfig::get_instance();
 
         const int fps = 30;
         const int width = g_config.rtsp_config_.width;
         const int height = g_config.rtsp_config_.height;
+
+        pending_detections_ = std::make_shared<toolkitx::concurrent::BlockingQueue<PendingDetection> >(10);
 
         region_ = vision::Region(cv::Rect(0, 0, width, height), width, height);
 
@@ -47,7 +49,7 @@ namespace detectionx {
 
         const vcodecx::StreamInfo stream_info{task_config_.id, task_config_.uri};
         const vcodecx::DecodeConfig decode_cfg{
-                width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 3
+            width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 3
         };
         decoder_ = codec_manager->create_decoder(stream_info, decode_cfg);
         if (!decoder_) {
@@ -56,7 +58,7 @@ namespace detectionx {
         }
 
         const vcodecx::EncodeConfig encode_cfg{
-                width, height, vcodecx::WorkerMode::Callback, fps, 3, vcodecx::CodecType::H265
+            width, height, vcodecx::WorkerMode::Callback, fps, 3, vcodecx::CodecType::H265
         };
         encoder_ = codec_manager->create_encoder(encode_cfg);
         if (!decoder_) {
@@ -66,7 +68,8 @@ namespace detectionx {
 
         encoder_->subscribe([this](const auto &e) { on_encoded(e); });
 
-        processor_ = std::thread(&Pipeline::process, this);
+        producer_ = std::thread(&Pipeline::producer, this);
+        consumer_ = std::thread(&Pipeline::consumer, this);
     }
 
     Pipeline::~Pipeline() {
@@ -76,8 +79,12 @@ namespace detectionx {
     void Pipeline::stop() {
         if (stopped_.exchange(true)) return;
 
-        if (processor_.joinable()) {
-            processor_.join();
+        if (producer_.joinable()) {
+            producer_.join();
+        }
+
+        if (consumer_.joinable()) {
+            consumer_.join();
         }
 
         if (decoder_) decoder_->release();
@@ -85,9 +92,7 @@ namespace detectionx {
         LOG_INFO("pipeline", "task pipeline %s stopped", task_config_.id.c_str());
     }
 
-    void Pipeline::process() const {
-        const auto& class_names = detector_->get_metadata().class_names;
-
+    void Pipeline::producer() const {
         while (!stopped_ && !decoder_->is_released()) {
             std::shared_ptr<vcodecx::FrameX> framex{};
             if (!decoder_->read(framex, 10)) {
@@ -95,23 +100,36 @@ namespace detectionx {
             }
 
             cv::Mat image(cv::Size(framex->width, framex->height), CV_8UC3, framex->ptr);
-            auto fut = detector_->commit(image);
+            const auto fut = detector_->commit(image);
 
-            if (fut.wait_for(std::chrono::milliseconds(30)) == std::future_status::ready) {
-                auto results = fut.get();
-                for (const auto& det : results) {
-                    cv::rectangle(image, det.bbox.rect, {0, 255, 0}, 2);
-                    char text[64];
-                    snprintf(text, sizeof(text), "%s %.2f", class_names[det.class_id].c_str(), det.score);
-                    cv::putText(
-                        image, text, cv::Point2f(det.bbox.x1(), det.bbox.y1() - 5.),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.6,
-                        {0, 255, 0}, 1, cv::LINE_AA
-                    );
-                }
+            pending_detections_->push({framex, fut}, 10);
+        }
+    }
+
+    void Pipeline::consumer() const {
+        const auto &class_names = detector_->get_metadata().class_names;
+
+        PendingDetection pd{};
+        while (!stopped_ && !decoder_->is_released()) {
+            if (!pending_detections_->pop(pd, 10)) {
+                continue;
             }
 
-            encoder_->write(framex, 3);
+            cv::Mat image(cv::Size(pd.framex->width, pd.framex->height), CV_8UC3, pd.framex->ptr);
+
+            auto results = pd.handle.get();
+            for (const auto &det: results) {
+                cv::rectangle(image, det.bbox.rect, {0, 255, 0}, 2);
+                char text[64];
+                snprintf(text, sizeof(text), "%s %.2f", class_names[det.class_id].c_str(), det.score);
+                cv::putText(
+                    image, text, cv::Point2f(det.bbox.x1(), det.bbox.y1() - 5.),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6,
+                    {0, 255, 0}, 1, cv::LINE_AA
+                );
+            }
+
+            encoder_->write(pd.framex, 3);
         }
     }
 
