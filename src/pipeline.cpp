@@ -119,6 +119,8 @@ namespace detectionx {
 
             auto results = pd.handle.get();
             for (const auto &det: results) {
+                // if (!region_.contains(det.bbox.rect)) continue;
+
                 cv::rectangle(image, det.bbox.rect, {0, 255, 0}, 2);
                 char text[64];
                 snprintf(text, sizeof(text), "%s %.2f", class_names[det.class_id].c_str(), det.score);
