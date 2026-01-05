@@ -6,25 +6,26 @@
 
 namespace detectionx {
     Pipeline::Pipeline(
-            TaskConfig cfg, const std::shared_ptr<vcodecx::Manager> &codec_manager,
+            TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
+            const std::shared_ptr<inferencex::detection::YOLO11Engine> &detector,
             const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
-    ) : task_config_(std::move(cfg)), codec_manager_(codec_manager), mqtt_client_(mqtt_client),
-        session_(session) {
-        GConfig &g_config = GConfig::get_instance();
+    ) : task_config_(std::move(task_config)), codec_manager_(codec_manager), detector_(detector),
+        mqtt_client_(mqtt_client),session_(session) {
+        const GConfig &g_config = GConfig::get_instance();
 
-        int fps = 30;
-        int width = g_config.rtsp_config_.width;
-        int height = g_config.rtsp_config_.height;
+        const int fps = 30;
+        const int width = g_config.rtsp_config_.width;
+        const int height = g_config.rtsp_config_.height;
 
         region_ = vision::Region(cv::Rect(0, 0, width, height), width, height);
 
         if (task_config_.type == "xyxy") {
             if (task_config_.values.size() == 4) {
-                int x1 = task_config_.values[0];
-                int y1 = task_config_.values[1];
-                int x2 = task_config_.values[2];
-                int y2 = task_config_.values[3];
-                cv::Rect rect(x1, y1, x2 - x1, y2 - y1);
+                const int x1 = task_config_.values[0];
+                const int y1 = task_config_.values[1];
+                const int x2 = task_config_.values[2];
+                const int y2 = task_config_.values[3];
+                const cv::Rect rect(x1, y1, x2 - x1, y2 - y1);
                 region_ = vision::Region(rect, width, height);
             } else {
                 LOG_WARN("pipeline", "xyxy region requires 4 floats but got %zu", task_config_.values.size());
@@ -40,7 +41,7 @@ namespace detectionx {
 
                 region_ = vision::Region(pts, width, height);
             } else {
-                LOG_WARN("pipeline", "polygon region requires N pairs but got %zu", cfg.values.size());
+                LOG_WARN("pipeline", "polygon region requires N pairs but got %zu", task_config.values.size());
             }
         }
 
@@ -54,7 +55,7 @@ namespace detectionx {
             return;
         }
 
-        vcodecx::EncodeConfig encode_cfg{
+        const vcodecx::EncodeConfig encode_cfg{
                 width, height, vcodecx::WorkerMode::Callback, fps, 3, vcodecx::CodecType::H265
         };
         encoder_ = codec_manager->create_encoder(encode_cfg);
@@ -85,11 +86,32 @@ namespace detectionx {
     }
 
     void Pipeline::process() const {
+        const auto& class_names = detector_->get_metadata().class_names;
+
         while (!stopped_ && !decoder_->is_released()) {
-            std::shared_ptr<vcodecx::FrameX> framex;
-            if (decoder_->read(framex, 10)) {
-                encoder_->write(framex, 3);
+            std::shared_ptr<vcodecx::FrameX> framex{};
+            if (!decoder_->read(framex, 10)) {
+                continue;
             }
+
+            cv::Mat image(cv::Size(framex->width, framex->height), CV_8UC3, framex->ptr);
+            auto fut = detector_->commit(image);
+
+            if (fut.wait_for(std::chrono::milliseconds(30)) == std::future_status::ready) {
+                auto results = fut.get();
+                for (const auto& det : results) {
+                    cv::rectangle(image, det.bbox.rect, {0, 255, 0}, 2);
+                    char text[64];
+                    snprintf(text, sizeof(text), "%s %.2f", class_names[det.class_id].c_str(), det.score);
+                    cv::putText(
+                        image, text, cv::Point2f(det.bbox.x1(), det.bbox.y1() - 5.),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.6,
+                        {0, 255, 0}, 1, cv::LINE_AA
+                    );
+                }
+            }
+
+            encoder_->write(framex, 3);
         }
     }
 

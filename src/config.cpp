@@ -41,6 +41,8 @@ namespace detectionx {
     }
 
     void GConfig::parse_detection(const YAML::Node &node) {
+        detection_config_.model_path = node["model_path"].as<std::string>();
+        detection_config_.num_workers = node["num_workers"].as<int>();
         detection_config_.threshold = node["threshold"].as<float>();
         detection_config_.classes = node["classes"].as<std::vector<int> >(std::vector<int>{});
     }

@@ -3,7 +3,7 @@
 #include <atomic>
 #include <csignal>
 
-#include "toolkitx/logx/logx.h"
+#include <toolkitx/logx/logx.h>
 
 #include "config.h"
 #include "pipeline.h"
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     /// ----------------------------------------
     ///                 LOGX
     /// ----------------------------------------
-    logx::Logger::init("vcodec", "debug", false);
+    logx::Logger::init("detectionx", "debug", false);
 
     /// ----------------------------------------
     ///                 CONFIG
@@ -29,6 +29,17 @@ int main(int argc, char *argv[]) {
     GConfig &g_config = GConfig::get_instance();
     if (!g_config.load("config.yaml")) {
         LOG_ERROR("test", "load config.yaml failed");
+        return -1;
+    }
+
+    /// ----------------------------------------
+    ///                 DETECTION
+    /// ----------------------------------------
+    const int num_workers = g_config.detection_config_.num_workers;
+    const std::string model_path = g_config.detection_config_.model_path;
+    auto detector = inferencex::detection::YOLO11Engine::create(model_path, num_workers);
+    if (!detector) {
+        LOG_ERROR("test", "create engine failed");
         return -1;
     }
 
@@ -69,7 +80,9 @@ int main(int argc, char *argv[]) {
         const std::string suffix = g_config.rtsp_config_.suffix + "/" + task_config.id;
         auto session = rtsp_server->add_session(suffix);
         session->add_source(rtspx::Video, rtspx::H265);
-        task_pipelines.emplace_back(std::make_unique<Pipeline>(task_config, codec_manager, session, mqttx_client));
+        task_pipelines.emplace_back(std::make_unique<Pipeline>(
+            task_config, codec_manager, detector, session, mqttx_client
+        ));
     }
 
     while (running) {

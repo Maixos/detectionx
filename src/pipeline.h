@@ -4,6 +4,7 @@
 #include <mqttx/client.h>
 #include <vcodecx/manager.h>
 #include <toolkitx/vision/region.h>
+#include <inferencex/engines/detection/yolo11.h>
 
 #include "config.h"
 
@@ -14,6 +15,7 @@ namespace detectionx {
 
         Pipeline(
                 TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
+                const std::shared_ptr<inferencex::detection::YOLO11Engine> &detector,
                 const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
         );
 
@@ -33,11 +35,12 @@ namespace detectionx {
         std::atomic<bool> stopped_{false};
 
         std::thread processor_{};
-        std::shared_ptr<vcodecx::Decoder> decoder_;
-        std::shared_ptr<vcodecx::Encoder> encoder_;
-        std::shared_ptr<vcodecx::Manager> codec_manager_;
+        std::shared_ptr<vcodecx::Decoder> decoder_{};
+        std::shared_ptr<vcodecx::Encoder> encoder_{};
+        std::shared_ptr<vcodecx::Manager> codec_manager_{};
+        std::shared_ptr<inferencex::detection::YOLO11Engine> detector_{};
 
-        std::shared_ptr<mqttx::Client> mqtt_client_;
-        std::shared_ptr<rtspx::MediaSession> session_;
+        std::shared_ptr<mqttx::Client> mqtt_client_{};
+        std::shared_ptr<rtspx::MediaSession> session_{};
     };
 }

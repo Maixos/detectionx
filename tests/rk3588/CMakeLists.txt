@@ -13,4 +13,4 @@ file(GLOB TEST_SRCS *.cpp)
 # ------------------------------------------------------------
 add_executable(${NAME} ${TEST_SRCS})
 
-target_link_libraries(${NAME} PRIVATE common yaml-cpp maixos::vcodecx::rkffmpeg)
+target_link_libraries(${NAME} PRIVATE common yaml-cpp maixos::vcodecx::rkffmpeg maixos::inferencex::yolo11)

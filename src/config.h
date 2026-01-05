@@ -32,19 +32,23 @@ namespace detectionx {
     };
 
     struct DetectionConfig {
+        std::string model_path{};
+        int num_workers{};
         float threshold{};
         std::vector<int> classes{};
 
         DetectionConfig() = default;
 
-        explicit DetectionConfig(const float threshold, std::vector<int> classes)
-            : threshold(threshold), classes(std::move(classes)) {
+        explicit DetectionConfig(std::string model_path, const int num_workers, const float threshold, std::vector<int> classes)
+            : model_path(std::move(model_path)), num_workers(num_workers), threshold(threshold), classes(std::move(classes)) {
         }
 
         [[nodiscard]] std::string to_string() const {
             std::ostringstream oss;
             oss << "DetectionConfig { "
-                    << "threshold: " << threshold
+                    << "model_path: " << model_path
+                    << ", num_workers: " << num_workers
+                    << ", threshold: " << threshold
                     << ", classes: [";
 
             for (size_t i = 0; i < classes.size(); ++i) {
