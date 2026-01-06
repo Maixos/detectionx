@@ -104,10 +104,7 @@ namespace detectionx {
         const int width = gcfg.rtsp_config_.width;
         const int height = gcfg.rtsp_config_.height;
 
-        region_ = vision::Region(
-            cv::Rect(0, 0, width, height),
-            width, height
-        );
+        region_ = vision::Region(cv::Rect(0, 0, width, height), width, height);
 
         if (task_config_.type == "xyxy") {
             if (task_config_.values.size() == 4) {
@@ -115,10 +112,7 @@ namespace detectionx {
                 const int y1 = task_config_.values[1];
                 const int x2 = task_config_.values[2];
                 const int y2 = task_config_.values[3];
-                region_ = vision::Region(
-                    cv::Rect(x1, y1, x2 - x1, y2 - y1),
-                    width, height
-                );
+                region_ = vision::Region(cv::Rect(x1, y1, x2 - x1, y2 - y1), width, height);
             }
             else {
                 LOG_WARN("pipeline", "xyxy region expects 4 values");
