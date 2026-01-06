@@ -84,12 +84,20 @@ int main(int argc, char* argv[]) {
         LOG_INFO("test", "loaded task config: %s", task_config.to_string().c_str());
         const std::string suffix = g_config.rtsp_config_.suffix + "/" + task_config.id;
         auto rtsp_session = rtsp_server->add_session(suffix);
+        if (!rtsp_session) {
+            LOG_WARN("test", "create rtsp session failed");
+            continue;
+        }
+
         rtsp_session->add_source(rtspx::Video, rtspx::H265);
 
         auto task = Pipeline::create(
             task_config, detector, codec_manager, rtsp_session, mqttx_client
         );
-        if (!task) continue;
+        if (!task) {
+            LOG_WARN("test", "create task failed");
+            continue;
+        }
 
         task_pipelines.emplace_back(task);
     }
