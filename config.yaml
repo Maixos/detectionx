@@ -5,9 +5,9 @@ project:
   describe: ""
 
 detection:
-  model_path: "asset/models/detection/yolo11/coco/rk3588/detection_yolo11n_coco_int8.rknn"
+  model_path: "asset/models/detection/yolo11/coco/rk3588/detection_yolo11s_coco_int8.rknn"
   num_workers: 3
-  threshold: 0.65
+  threshold: 0.6
   classes:
 
 mqtt:
