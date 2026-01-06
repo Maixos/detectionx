@@ -30,7 +30,7 @@ namespace detectionx {
         void release();
 
         static std::shared_ptr<Pipeline> create(
-            TaskConfig task_config,
+            const TaskConfig& task_config,
             const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults>>& detector,
             const std::shared_ptr<vcodecx::Manager>& codec_manager,
             const std::shared_ptr<rtspx::MediaSession>& rtsp_session,

@@ -1,16 +1,16 @@
 #include "pipeline.h"
 
 #include <opencv2/opencv.hpp>
-
 #include <toolkitx/logx/logx.h>
+#include <toolkitx/vision/visualization.h>
 
 namespace detectionx {
     Pipeline::Pipeline(
         TaskConfig task_config,
-        const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults>>& detector,
-        const std::shared_ptr<vcodecx::Manager>& codec_manager,
-        const std::shared_ptr<rtspx::MediaSession>& rtsp_session,
-        const std::shared_ptr<mqttx::Client>& mqtt_client
+        const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults> > &detector,
+        const std::shared_ptr<vcodecx::Manager> &codec_manager,
+        const std::shared_ptr<rtspx::MediaSession> &rtsp_session,
+        const std::shared_ptr<mqttx::Client> &mqtt_client
     ) : task_config_(std::move(task_config)), detector_(detector), codec_manager_(codec_manager),
         rtsp_session_(rtsp_session), mqtt_client_(mqtt_client) {
     }
@@ -32,7 +32,7 @@ namespace detectionx {
 
         init_region();
 
-        detection_queue_ = std::make_shared<toolkitx::concurrent::BlockingQueue<DetectionTask>>(10);
+        detection_queue_ = std::make_shared<toolkitx::concurrent::BlockingQueue<DetectionTask> >(10);
 
         stopped_.store(false);
 
@@ -62,19 +62,21 @@ namespace detectionx {
 
             cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
-            region_.draw(image, 0.15, 1);
+            region_.draw(image, 0.1, 1);
 
             auto results = task.handle.get();
-            for (const auto& det : results) {
+            for (const auto &det: results) {
                 if (!region_.contains(det.bbox.rect)) continue;
 
-                cv::rectangle(image, det.bbox.rect, {0, 255, 0}, 2);
+                auto color = vision::id_to_color(det.class_id);
+                cv::rectangle(image, det.bbox.rect, color, 2);
+                cv::circle(image, cv::Point2f(det.bbox.cx(), det.bbox.cy()), 3, color, cv::FILLED);
                 char text[64];
                 snprintf(text, sizeof(text), "%s %.2f", std::to_string(det.class_id).c_str(), det.score);
                 cv::putText(
-                    image, text, cv::Point2f(det.bbox.x1(), det.bbox.y1() - 5.),
+                    image, text, cv::Point2f(det.bbox.x1(), det.bbox.y1() - 5.f),
                     cv::FONT_HERSHEY_SIMPLEX, 0.6,
-                    {0, 255, 0}, 1, cv::LINE_AA
+                    color, 1, cv::LINE_AA
                 );
             }
 
@@ -100,7 +102,7 @@ namespace detectionx {
     }
 
     bool Pipeline::init_region() {
-        const auto& gcfg = GConfig::get_instance();
+        const auto &gcfg = GConfig::get_instance();
         const int width = gcfg.rtsp_config_.width;
         const int height = gcfg.rtsp_config_.height;
 
@@ -108,17 +110,15 @@ namespace detectionx {
 
         if (task_config_.type == "xyxy") {
             if (task_config_.values.size() == 4) {
-                const int x1 = task_config_.values[0];
-                const int y1 = task_config_.values[1];
-                const int x2 = task_config_.values[2];
-                const int y2 = task_config_.values[3];
-                region_ = vision::Region(cv::Rect(x1, y1, x2 - x1, y2 - y1), width, height);
-            }
-            else {
+                const auto x1 = task_config_.values[0];
+                const auto y1 = task_config_.values[1];
+                const auto x2 = task_config_.values[2];
+                const auto y2 = task_config_.values[3];
+                region_ = vision::Region(cv::Rect2f(x1, y1, x2 - x1, y2 - y1), width, height);
+            } else {
                 LOG_WARN("pipeline", "xyxy region expects 4 values");
             }
-        }
-        else if (task_config_.type == "polygon") {
+        } else if (task_config_.type == "polygon") {
             if (!task_config_.values.empty() && task_config_.values.size() % 2 == 0) {
                 std::vector<cv::Point2f> pts;
                 for (size_t i = 0; i < task_config_.values.size(); i += 2) {
@@ -128,12 +128,10 @@ namespace detectionx {
                     );
                 }
                 region_ = vision::Region(pts, width, height);
-            }
-            else {
+            } else {
                 LOG_WARN("pipeline", "invalid polygon region config");
             }
-        }
-        else if (task_config_.type == "ratio") {
+        } else if (task_config_.type == "ratio") {
             if (task_config_.values.size() == 4) {
                 const float l = task_config_.values[0];
                 const float t = task_config_.values[1];
@@ -145,17 +143,15 @@ namespace detectionx {
                     LOG_WARN(
                         "pipeline", "invalid ratio padding: [%.2f, %.2f, %.2f, %.2f]", l, t, r, b
                     );
-                }
-                else {
-                    const int x1 = static_cast<int>(l * width);
-                    const int y1 = static_cast<int>(t * height);
-                    const int x2 = static_cast<int>((1.f - r) * width);
-                    const int y2 = static_cast<int>((1.f - b) * height);
+                } else {
+                    const auto x1 = l * width;
+                    const auto y1 = t * height;
+                    const auto x2 = (1.f - r) * width;
+                    const auto y2 = (1.f - b) * height;
 
-                    region_ = vision::Region(cv::Rect(x1, y1, x2 - x1, y2 - y1), width, height);
+                    region_ = vision::Region(cv::Rect2f(x1, y1, x2 - x1, y2 - y1), width, height);
                 }
-            }
-            else {
+            } else {
                 LOG_WARN("pipeline", "ratio region expects 4 values");
             }
         }
@@ -164,7 +160,7 @@ namespace detectionx {
     }
 
     bool Pipeline::init_codec() {
-        const auto& gcfg = GConfig::get_instance();
+        const auto &gcfg = GConfig::get_instance();
         const int width = gcfg.rtsp_config_.width;
         const int height = gcfg.rtsp_config_.height;
         constexpr int fps = 30;
@@ -189,14 +185,14 @@ namespace detectionx {
             return false;
         }
 
-        encoder_->subscribe([this](const auto& e) {
+        encoder_->subscribe([this](const auto &e) {
             on_encoded(e);
         });
 
         return true;
     }
 
-    void Pipeline::on_encoded(const std::shared_ptr<vcodecx::EncodedX>& encodedx) const {
+    void Pipeline::on_encoded(const std::shared_ptr<vcodecx::EncodedX> &encodedx) const {
         if (encodedx->size == 0) return;
 
         rtspx::EncodedShared packet{};
@@ -210,11 +206,11 @@ namespace detectionx {
     }
 
     std::shared_ptr<Pipeline> Pipeline::create(
-        TaskConfig task_config,
-        const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults>>& detector,
-        const std::shared_ptr<vcodecx::Manager>& codec_manager,
-        const std::shared_ptr<rtspx::MediaSession>& rtsp_session,
-        const std::shared_ptr<mqttx::Client>& mqtt_client
+        const TaskConfig &task_config,
+        const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults> > &detector,
+        const std::shared_ptr<vcodecx::Manager> &codec_manager,
+        const std::shared_ptr<rtspx::MediaSession> &rtsp_session,
+        const std::shared_ptr<mqttx::Client> &mqtt_client
     ) {
         auto task = std::make_shared<Pipeline>(task_config, detector, codec_manager, rtsp_session, mqtt_client);
         if (!task->startup()) {
