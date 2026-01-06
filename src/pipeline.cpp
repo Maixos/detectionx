@@ -6,124 +6,69 @@
 
 namespace detectionx {
     Pipeline::Pipeline(
-        TaskConfig task_config, const std::shared_ptr<vcodecx::Manager> &codec_manager,
-        const std::shared_ptr<inferencex::detection::YOLO11Engine> &detector,
-        const std::shared_ptr<rtspx::MediaSession> &session, const std::shared_ptr<mqttx::Client> &mqtt_client
-    ) : task_config_(std::move(task_config)), codec_manager_(codec_manager), detector_(detector),
-        mqtt_client_(mqtt_client), session_(session) {
-        const GConfig &g_config = GConfig::get_instance();
-
-        const int fps = 30;
-        const int width = g_config.rtsp_config_.width;
-        const int height = g_config.rtsp_config_.height;
-
-        pending_detections_ = std::make_shared<toolkitx::concurrent::BlockingQueue<PendingDetection> >(10);
-
-        region_ = vision::Region(cv::Rect(0, 0, width, height), width, height);
-
-        if (task_config_.type == "xyxy") {
-            if (task_config_.values.size() == 4) {
-                const int x1 = task_config_.values[0];
-                const int y1 = task_config_.values[1];
-                const int x2 = task_config_.values[2];
-                const int y2 = task_config_.values[3];
-                const cv::Rect rect(x1, y1, x2 - x1, y2 - y1);
-                region_ = vision::Region(rect, width, height);
-            } else {
-                LOG_WARN("pipeline", "xyxy region requires 4 floats but got %zu", task_config_.values.size());
-            }
-        } else if (task_config_.type == "polygon") {
-            if (task_config_.values.size() % 2 == 0 && !task_config_.values.empty()) {
-                std::vector<cv::Point2f> pts;
-                pts.reserve(task_config_.values.size() / 2);
-
-                for (size_t i = 0; i < task_config_.values.size(); i += 2) {
-                    pts.emplace_back(task_config_.values[i], task_config_.values[i + 1]);
-                }
-
-                region_ = vision::Region(pts, width, height);
-            } else {
-                LOG_WARN("pipeline", "polygon region requires N pairs but got %zu", task_config.values.size());
-            }
-        }
-
-        const vcodecx::StreamInfo stream_info{task_config_.id, task_config_.uri};
-        const vcodecx::DecodeConfig decode_cfg{
-            width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 3
-        };
-        decoder_ = codec_manager->create_decoder(stream_info, decode_cfg);
-        if (!decoder_) {
-            LOG_ERROR("pipeline", "failed to create decoder");
-            return;
-        }
-
-        const vcodecx::EncodeConfig encode_cfg{
-            width, height, vcodecx::WorkerMode::Callback, fps, 3, vcodecx::CodecType::H265
-        };
-        encoder_ = codec_manager->create_encoder(encode_cfg);
-        if (!decoder_) {
-            LOG_ERROR("pipeline", "failed to create encoder");
-            return;
-        }
-
-        encoder_->subscribe([this](const auto &e) { on_encoded(e); });
-
-        producer_ = std::thread(&Pipeline::producer, this);
-        consumer_ = std::thread(&Pipeline::consumer, this);
+        TaskConfig task_config,
+        const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults>>& detector,
+        const std::shared_ptr<vcodecx::Manager>& codec_manager,
+        const std::shared_ptr<rtspx::MediaSession>& rtsp_session,
+        const std::shared_ptr<mqttx::Client>& mqtt_client
+    ) : task_config_(std::move(task_config)), detector_(detector), codec_manager_(codec_manager),
+        rtsp_session_(rtsp_session), mqtt_client_(mqtt_client) {
     }
 
     Pipeline::~Pipeline() {
-        stop();
+        release();
     }
 
-    void Pipeline::stop() {
-        if (stopped_.exchange(true)) return;
-
-        if (producer_.joinable()) {
-            producer_.join();
+    bool Pipeline::startup() {
+        if (!stopped_.load()) {
+            LOG_WARN("pipeline", "pipeline already started");
+            return true;
         }
 
-        if (consumer_.joinable()) {
-            consumer_.join();
+        if (!init_codec()) {
+            shutdown();
+            return false;
         }
 
-        if (decoder_) decoder_->release();
-        if (encoder_) encoder_->release();
-        LOG_INFO("pipeline", "task pipeline %s stopped", task_config_.id.c_str());
+        init_region();
+
+        detection_queue_ = std::make_shared<toolkitx::concurrent::BlockingQueue<DetectionTask>>(10);
+
+        stopped_.store(false);
+
+        detect_thread_ = std::thread(&Pipeline::detect_thread, this);
+        process_thread_ = std::thread(&Pipeline::process_thread, this);
+
+        LOG_INFO("pipeline", "pipeline %s started", task_config_.id.c_str());
+        return true;
     }
 
-    void Pipeline::producer() const {
+    void Pipeline::detect_thread() const {
         while (!stopped_ && !decoder_->is_released()) {
             std::shared_ptr<vcodecx::FrameX> framex{};
-            if (!decoder_->read(framex, 10)) {
-                continue;
-            }
+            if (!decoder_->read(framex, 10)) continue;
 
             cv::Mat image(cv::Size(framex->width, framex->height), CV_8UC3, framex->ptr);
             const auto fut = detector_->commit(image);
 
-            pending_detections_->push({framex, fut}, 10);
+            detection_queue_->push({framex, fut}, 10);
         }
     }
 
-    void Pipeline::consumer() const {
-        const auto &class_names = detector_->get_metadata().class_names;
-
-        PendingDetection pd{};
+    void Pipeline::process_thread() const {
+        DetectionTask task{};
         while (!stopped_ && !decoder_->is_released()) {
-            if (!pending_detections_->pop(pd, 10)) {
-                continue;
-            }
+            if (!detection_queue_->pop(task, 10)) continue;
 
-            cv::Mat image(cv::Size(pd.framex->width, pd.framex->height), CV_8UC3, pd.framex->ptr);
+            cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
-            auto results = pd.handle.get();
-            for (const auto &det: results) {
+            auto results = task.handle.get();
+            for (const auto& det : results) {
                 // if (!region_.contains(det.bbox.rect)) continue;
 
                 cv::rectangle(image, det.bbox.rect, {0, 255, 0}, 2);
                 char text[64];
-                snprintf(text, sizeof(text), "%s %.2f", class_names[det.class_id].c_str(), det.score);
+                snprintf(text, sizeof(text), "%s %.2f", std::to_string(det.class_id).c_str(), det.score);
                 cv::putText(
                     image, text, cv::Point2f(det.bbox.x1(), det.bbox.y1() - 5.),
                     cv::FONT_HERSHEY_SIMPLEX, 0.6,
@@ -131,11 +76,105 @@ namespace detectionx {
                 );
             }
 
-            encoder_->write(pd.framex, 3);
+            encoder_->write(task.framex, 3);
         }
     }
 
-    void Pipeline::on_encoded(const std::shared_ptr<vcodecx::EncodedX> &encodedx) const {
+    void Pipeline::release() {
+        if (stopped_.exchange(true)) return;
+
+        shutdown();
+
+        LOG_INFO("pipeline", "pipeline %s stopped", task_config_.id.c_str());
+    }
+
+    void Pipeline::shutdown() {
+        if (detect_thread_.joinable()) detect_thread_.join();
+
+        if (process_thread_.joinable()) process_thread_.join();
+
+        if (decoder_) decoder_->release();
+        if (encoder_) encoder_->release();
+    }
+
+    bool Pipeline::init_region() {
+        const auto& gcfg = GConfig::get_instance();
+        const int width = gcfg.rtsp_config_.width;
+        const int height = gcfg.rtsp_config_.height;
+
+        region_ = vision::Region(
+            cv::Rect(0, 0, width, height),
+            width, height
+        );
+
+        if (task_config_.type == "xyxy") {
+            if (task_config_.values.size() == 4) {
+                const int x1 = task_config_.values[0];
+                const int y1 = task_config_.values[1];
+                const int x2 = task_config_.values[2];
+                const int y2 = task_config_.values[3];
+                region_ = vision::Region(
+                    cv::Rect(x1, y1, x2 - x1, y2 - y1),
+                    width, height
+                );
+            }
+            else {
+                LOG_WARN("pipeline", "xyxy region expects 4 values");
+            }
+        }
+        else if (task_config_.type == "polygon") {
+            if (!task_config_.values.empty() && task_config_.values.size() % 2 == 0) {
+                std::vector<cv::Point2f> pts;
+                for (size_t i = 0; i < task_config_.values.size(); i += 2) {
+                    pts.emplace_back(
+                        task_config_.values[i],
+                        task_config_.values[i + 1]
+                    );
+                }
+                region_ = vision::Region(pts, width, height);
+            }
+            else {
+                LOG_WARN("pipeline", "invalid polygon region config");
+            }
+        }
+
+        return true;
+    }
+
+    bool Pipeline::init_codec() {
+        const auto& gcfg = GConfig::get_instance();
+        const int width = gcfg.rtsp_config_.width;
+        const int height = gcfg.rtsp_config_.height;
+        constexpr int fps = 30;
+
+        const vcodecx::StreamInfo stream_info{task_config_.id, task_config_.uri};
+
+        const vcodecx::DecodeConfig decode_cfg{
+            width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 3
+        };
+        decoder_ = codec_manager_->create_decoder(stream_info, decode_cfg);
+        if (!decoder_) {
+            LOG_ERROR("pipeline", "failed to create decoder");
+            return false;
+        }
+
+        const vcodecx::EncodeConfig encode_cfg{
+            width, height, vcodecx::WorkerMode::Callback, fps, 3, vcodecx::CodecType::H265
+        };
+        encoder_ = codec_manager_->create_encoder(encode_cfg);
+        if (!encoder_) {
+            LOG_ERROR("pipeline", "failed to create encoder");
+            return false;
+        }
+
+        encoder_->subscribe([this](const auto& e) {
+            on_encoded(e);
+        });
+
+        return true;
+    }
+
+    void Pipeline::on_encoded(const std::shared_ptr<vcodecx::EncodedX>& encodedx) const {
         if (encodedx->size == 0) return;
 
         rtspx::EncodedShared packet{};
@@ -145,6 +184,22 @@ namespace detectionx {
         packet.data = encodedx->data;
         packet.holder = encodedx->holder;
 
-        session_->push_data(rtspx::MediaTrack::Video, packet);
+        rtsp_session_->push_data(rtspx::MediaTrack::Video, packet);
+    }
+
+    std::shared_ptr<Pipeline> Pipeline::create(
+        TaskConfig task_config,
+        const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults>>& detector,
+        const std::shared_ptr<vcodecx::Manager>& codec_manager,
+        const std::shared_ptr<rtspx::MediaSession>& rtsp_session,
+        const std::shared_ptr<mqttx::Client>& mqtt_client
+    ) {
+        auto task = std::make_shared<Pipeline>(task_config, detector, codec_manager, rtsp_session, mqtt_client);
+        if (!task->startup()) {
+            LOG_ERROR("pipeline", "failed to startup pipeline");
+            return nullptr;
+        }
+
+        return task;
     }
 };

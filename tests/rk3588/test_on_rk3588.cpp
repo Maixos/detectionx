@@ -12,9 +12,11 @@ using namespace detectionx;
 
 std::atomic<bool> running{true};
 
-void handle_sigint(int) { running = false; }
+void handle_sigint(int) {
+    running = false;
+}
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     signal(SIGINT, handle_sigint);
     signal(SIGTERM, handle_sigint);
 
@@ -26,7 +28,7 @@ int main(int argc, char *argv[]) {
     /// ----------------------------------------
     ///                 CONFIG
     /// ----------------------------------------
-    GConfig &g_config = GConfig::get_instance();
+    GConfig& g_config = GConfig::get_instance();
     if (!g_config.load("config.yaml")) {
         LOG_ERROR("test", "load config.yaml failed");
         return -1;
@@ -73,16 +75,20 @@ int main(int argc, char *argv[]) {
     /// ----------------------------------------
     ///                 PIPELINES
     /// ----------------------------------------
-    std::vector<std::unique_ptr<Pipeline> > task_pipelines;
+    std::vector<std::shared_ptr<Pipeline>> task_pipelines;
     const auto codec_manager = vcodecx::Manager::instance();
-    for (const auto &task_config: g_config.task_configs_) {
+    for (const auto& task_config : g_config.task_configs_) {
         LOG_INFO("test", "loaded task config: %s", task_config.to_string().c_str());
         const std::string suffix = g_config.rtsp_config_.suffix + "/" + task_config.id;
-        auto session = rtsp_server->add_session(suffix);
-        session->add_source(rtspx::Video, rtspx::H265);
-        task_pipelines.emplace_back(std::make_unique<Pipeline>(
-            task_config, codec_manager, detector, session, mqttx_client
-        ));
+        auto rtsp_session = rtsp_server->add_session(suffix);
+        rtsp_session->add_source(rtspx::Video, rtspx::H265);
+
+        auto task = Pipeline::create(
+            task_config, detector, codec_manager, rtsp_session, mqttx_client
+        );
+        if (!task) continue;
+
+        task_pipelines.emplace_back(task);
     }
 
     while (running) {
