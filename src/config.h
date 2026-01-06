@@ -117,11 +117,11 @@ namespace detectionx {
         std::string id;
         std::string uri;
         std::string type;
-        std::vector<int> values;
+        std::vector<float> values;
 
         TaskConfig() = default;
 
-        TaskConfig(std::string id, std::string uri, std::string type, const std::vector<int> &values)
+        TaskConfig(std::string id, std::string uri, std::string type, const std::vector<float> &values)
             : id(std::move(id)), uri(std::move(uri)), type(std::move(type)), values(values) {
         }
 

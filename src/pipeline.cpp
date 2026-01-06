@@ -62,6 +62,8 @@ namespace detectionx {
 
             cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
+            region_.draw(image);
+
             auto results = task.handle.get();
             for (const auto& det : results) {
                 // if (!region_.contains(det.bbox.rect)) continue;
@@ -135,6 +137,32 @@ namespace detectionx {
             }
             else {
                 LOG_WARN("pipeline", "invalid polygon region config");
+            }
+        }
+        else if (task_config_.type == "ratio") {
+            if (task_config_.values.size() == 4) {
+                const float l = task_config_.values[0];
+                const float t = task_config_.values[1];
+                const float r = task_config_.values[2];
+                const float b = task_config_.values[3];
+
+                if (l < 0.f || t < 0.f || r < 0.f || b < 0.f ||
+                    l + r >= 1.f || t + b >= 1.f) {
+                    LOG_WARN(
+                        "pipeline", "invalid ratio padding: [%.2f, %.2f, %.2f, %.2f]", l, t, r, b
+                    );
+                }
+                else {
+                    const int x1 = static_cast<int>(l * width);
+                    const int y1 = static_cast<int>(t * height);
+                    const int x2 = static_cast<int>((1.f - r) * width);
+                    const int y2 = static_cast<int>((1.f - b) * height);
+
+                    region_ = vision::Region(cv::Rect(x1, y1, x2 - x1, y2 - y1), width, height);
+                }
+            }
+            else {
+                LOG_WARN("pipeline", "ratio region expects 4 values");
             }
         }
 

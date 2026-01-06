@@ -6,7 +6,7 @@
 #include "toolkitx/file/path.h"
 
 namespace detectionx {
-    bool GConfig::load(const std::string &filename) {
+    bool GConfig::load(const std::string& filename) {
         if (loaded_) {
             LOG_ERROR("config", "config already loaded, skipping reload");
             return false;
@@ -27,62 +27,69 @@ namespace detectionx {
             loaded_ = true;
 
             return true;
-        } catch (const std::exception &e) {
+        }
+        catch (const std::exception& e) {
             LOG_ERROR("config", "failed to load configuration: %s", e.what());
             return false;
         }
     }
 
-    void GConfig::parse_project(const YAML::Node &node) {
+    void GConfig::parse_project(const YAML::Node& node) {
         project_config_.mode = node["mode"].as<std::string>();
         project_config_.name = node["name"].as<std::string>();
         project_config_.version = node["version"].as<std::string>();
         project_config_.describe = node["describe"].as<std::string>();
     }
 
-    void GConfig::parse_detection(const YAML::Node &node) {
+    void GConfig::parse_detection(const YAML::Node& node) {
         detection_config_.model_path = node["model_path"].as<std::string>();
         detection_config_.num_workers = node["num_workers"].as<int>();
         detection_config_.threshold = node["threshold"].as<float>();
-        detection_config_.classes = node["classes"].as<std::vector<int> >(std::vector<int>{});
+        detection_config_.classes = node["classes"].as<std::vector<int>>(std::vector<int>{});
     }
 
-    void GConfig::parse_rtsp(const YAML::Node &node) {
+    void GConfig::parse_rtsp(const YAML::Node& node) {
         rtsp_config_.port = node["port"].as<int>();
         rtsp_config_.width = node["width"].as<int>();
         rtsp_config_.height = node["height"].as<int>();
         rtsp_config_.suffix = node["suffix"].as<std::string>();
     }
 
-    void GConfig::parse_mqtt(const YAML::Node &node) {
+    void GConfig::parse_mqtt(const YAML::Node& node) {
         mqtt_config_.enable = node["enable"].as<bool>();
         mqtt_config_.ip = node["ip"].as<std::string>();
         mqtt_config_.port = node["port"].as<std::string>();
         mqtt_config_.notify_topic = node["notify_topic"].as<std::string>();
     }
 
-    void GConfig::parse_tasks(const YAML::Node &node) {
+    void GConfig::parse_tasks(const YAML::Node& node) {
         task_configs_.reserve(node.size());
 
-        for (const auto &item: node) {
+        for (const auto& item : node) {
             auto id = item["id"].as<std::string>();
             auto uri = item["uri"].as<std::string>();
 
             std::string type{};
-            std::vector<int> values{};
+            std::vector<float> values{};
             if (item["region"]) {
-                const auto &rnode = item["region"];
+                const auto& rnode = item["region"];
 
                 type = rnode["type"].as<std::string>();
 
                 if (type == "xyxy") {
-                    for (auto &v: rnode["xyxy"]) {
-                        values.push_back(v.as<int>());
+                    for (auto& v : rnode["xyxy"]) {
+                        values.push_back(v.as<float>());
                     }
-                } else if (type == "polygon") {
-                    for (auto &pt: rnode["polygon"]) {
-                        values.push_back(pt[0].as<int>());
-                        values.push_back(pt[1].as<int>());
+                }
+                else if (type == "polygon") {
+                    for (auto& pt : rnode["polygon"]) {
+                        values.push_back(pt[0].as<float>());
+                        values.push_back(pt[1].as<float>());
+                    }
+                }
+                else if (type == "ratio") {
+                    for (const auto& v : rnode["ratio"]) {
+                        values.push_back(v.as<float>());
                     }
                 }
             }

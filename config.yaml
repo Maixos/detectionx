@@ -23,14 +23,32 @@ rtsp:
   height: 720
   suffix: detectionx
 
+# tasks: 任务列表，每个任务对应一路视频源
+#
+# region.type 支持三种区域定义方式：
+#   - ratio   : 四边相对边缘的比例区域
+#               ratio = [left, top, right, bottom], 取值范围 [0, 1)
+#
+#   - xyxy    : 像素坐标矩形区域
+#               xyxy = [x1, y1, x2, y2]
+#
+#   - polygon : 多边形区域（像素坐标）
+#               polygon = [ [x1, y1], [x2, y2], ... ]
+#
 tasks:
   - id: cam00001
     uri: /dev/video1
     region:
-      type: xyxy
-      xyxy: [ 100, 100, 200, 300 ]
+      type: ratio
+      ratio: [ 0.2, 0.2, 0.2, 0.2 ]
 
 #  - id: cam00002
+#    uri: /dev/video1
+#    region:
+#      type: xyxy
+#      xyxy: [ 100, 100, 200, 300 ]
+
+#  - id: cam00003
 #    uri: /dev/video2
 #    region:
 #      type: polygon
