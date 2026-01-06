@@ -62,11 +62,11 @@ namespace detectionx {
 
             cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
-            region_.draw(image);
+            region_.draw(image, 0.15, 1);
 
             auto results = task.handle.get();
             for (const auto& det : results) {
-                // if (!region_.contains(det.bbox.rect)) continue;
+                if (!region_.contains(det.bbox.rect)) continue;
 
                 cv::rectangle(image, det.bbox.rect, {0, 255, 0}, 2);
                 char text[64];
