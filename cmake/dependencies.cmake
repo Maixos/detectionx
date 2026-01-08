@@ -48,5 +48,6 @@ find_package(rtspx REQUIRED)
 find_package(mqttx REQUIRED)
 find_package(rkffmpeg REQUIRED)
 find_package(toolkitx REQUIRED)
+find_package(inferencex REQUIRED)
 
 # Find packages via pkg-config
