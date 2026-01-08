@@ -27,32 +27,61 @@ rtsp:
 #
 # region.type 支持三种区域定义方式：
 #   - ratio   : 四边相对边缘的比例区域
-#               ratio = [left, top, right, bottom], 取值范围 [0, 1)
+#               values = [left, top, right, bottom], 取值范围 [0, 1)
 #
 #   - xyxy    : 像素坐标矩形区域
-#               xyxy = [x1, y1, x2, y2]
+#               values = [x1, y1, x2, y2]
 #
 #   - polygon : 多边形区域（像素坐标）
-#               polygon = [ [x1, y1], [x2, y2], ... ]
+#               values = [ [x1, y1], [x2, y2], ... ]
 #
 tasks:
   - id: cam00001
-    uri: /dev/video1
+    uri: /home/firefly/coder/projs/maixos/detectionx/asset/videos/1.mp4
     region:
-      type: ratio
-      ratio: [ 0.2, 0.2, 0.2, 0.2 ]
+      type: polygon
+      values: [ [280, 340], [838, 342], [1136, 536], [14, 491] ]
 
+#  - id: cam00002
+#    uri: /home/firefly/coder/projs/maixos/detectionx/asset/videos/2.mp4
+#    region:
+#      type: ratio
+#      values: [ 0.2, 0.2, 0.2, 0.2 ]
+#
+#  - id: cam00003
+#    uri: /home/firefly/coder/projs/maixos/detectionx/asset/videos/3.mp4
+#    region:
+#      type: ratio
+#      values: [ 0.2, 0.2, 0.2, 0.2 ]
+#
+#  - id: cam00004
+#    uri: /home/firefly/coder/projs/maixos/detectionx/asset/videos/4.mp4
+#    region:
+#      type: ratio
+#      values: [ 0.2, 0.2, 0.2, 0.2 ]
+#
+#  - id: cam00005
+#    uri: /home/firefly/coder/projs/maixos/detectionx/asset/videos/5.mp4
+#    region:
+#      type: ratio
+#      values: [ 0.2, 0.2, 0.2, 0.2 ]
+#
+#  - id: cam00006
+#    uri: /home/firefly/coder/projs/maixos/detectionx/asset/videos/6.mp4
+#    region:
+#      type: ratio
+#      values: [ 0.2, 0.2, 0.2, 0.2 ]
 #  - id: cam00002
 #    uri: /dev/video1
 #    region:
 #      type: xyxy
-#      xyxy: [ 100, 100, 200, 300 ]
+#      values: [ 100, 100, 200, 300 ]
 
 #  - id: cam00003
 #    uri: /dev/video2
 #    region:
 #      type: polygon
-#      polygon:
+#      values:
 #        - [ 100, 100 ]
 #        - [ 300, 100 ]
 #        - [ 350, 300 ]

@@ -77,18 +77,18 @@ namespace detectionx {
                 type = rnode["type"].as<std::string>();
 
                 if (type == "xyxy") {
-                    for (auto& v : rnode["xyxy"]) {
+                    for (auto& v : rnode["values"]) {
                         values.push_back(v.as<float>());
                     }
                 }
                 else if (type == "polygon") {
-                    for (auto& pt : rnode["polygon"]) {
+                    for (auto& pt : rnode["values"]) {
                         values.push_back(pt[0].as<float>());
                         values.push_back(pt[1].as<float>());
                     }
                 }
                 else if (type == "ratio") {
-                    for (const auto& v : rnode["ratio"]) {
+                    for (const auto& v : rnode["values"]) {
                         values.push_back(v.as<float>());
                     }
                 }
