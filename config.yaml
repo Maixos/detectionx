@@ -36,40 +36,40 @@ rtsp:
 #               values = [ [x1, y1], [x2, y2], ... ]
 #
 tasks:
-  - id: cam00001
-    uri: /home/firefly/Videos/1.mp4
-    region:
-      type: polygon
-      values: [ [280, 340], [860, 342], [1350, 610], [3, 628], [3, 495], [14, 491] ]
-
-  - id: cam00002
-    uri: /home/firefly/Videos/2.mp4
-    region:
-      type: polygon
-      values: [ [233, 300], [1000, 296], [1276, 440], [1276, 600], [3, 560], [3, 425] ]
+#  - id: cam00001
+#    uri: /home/firefly/Videos/1.mp4
+#    region:
+#      type: polygon
+#      values: [ [280, 340], [860, 342], [1350, 610], [3, 628], [3, 495], [14, 491] ]
+#
+#  - id: cam00002
+#    uri: /home/firefly/Videos/2.mp4
+#    region:
+#      type: polygon
+#      values: [ [233, 300], [1000, 296], [1276, 440], [1276, 600], [3, 560], [3, 425] ]
 
 #  - id: cam00003
 #    uri: /home/firefly/Videos/3.mp4
 #    region:
-#      type: ratio
-#      values: [ 0.2, 0.2, 0.2, 0.2 ]
-#
-#  - id: cam00004
-#    uri: /home/firefly/Videos/4.mp4
-#    region:
-#      type: ratio
-#      values: [ 0.2, 0.2, 0.2, 0.2 ]
-#
+#      type: polygon
+#      values: [ [423, 398], [730, 392], [1045, 616], [190, 630] ]
+
+  - id: cam00004
+    uri: /home/firefly/Videos/4.mp4
+    region:
+      type: polygon
+      values: [ [423, 398], [730, 392], [1045, 616], [190, 630] ]
+
 #  - id: cam00005
 #    uri: /home/firefly/Videos/5.mp4
 #    region:
-#      type: ratio
+#      type: polygon
 #      values: [ 0.2, 0.2, 0.2, 0.2 ]
 #
 #  - id: cam00006
 #    uri: /home/firefly/Videos/6.mp4
 #    region:
-#      type: ratio
+#      type: polygon
 #      values: [ 0.2, 0.2, 0.2, 0.2 ]
 
 #  - id: cam00002
