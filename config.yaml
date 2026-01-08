@@ -36,12 +36,12 @@ rtsp:
 #               values = [ [x1, y1], [x2, y2], ... ]
 #
 tasks:
-#  - id: cam00001
-#    uri: /home/firefly/Videos/1.mp4
-#    region:
-#      type: polygon
-#      values: [ [280, 340], [860, 342], [1350, 610], [3, 628], [3, 495], [14, 491] ]
-#
+  - id: cam00001
+    uri: /home/firefly/Videos/1.mp4
+    region:
+      type: polygon
+      values: [ [280, 340], [860, 342], [1350, 610], [3, 628], [3, 495], [14, 491] ]
+
 #  - id: cam00002
 #    uri: /home/firefly/Videos/2.mp4
 #    region:
@@ -54,11 +54,11 @@ tasks:
 #      type: polygon
 #      values: [ [423, 398], [730, 392], [1045, 616], [190, 630] ]
 
-  - id: cam00004
-    uri: /home/firefly/Videos/4.mp4
-    region:
-      type: polygon
-      values: [ [184, 182], [783, 190], [1000, 352], [9, 380] ]
+#  - id: cam00004
+#    uri: /home/firefly/Videos/4.mp4
+#    region:
+#      type: polygon
+#      values: [ [184, 182], [783, 190], [1000, 352], [9, 380] ]
 
 #  - id: cam00005
 #    uri: /home/firefly/Videos/5.mp4

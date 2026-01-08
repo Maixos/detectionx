@@ -52,7 +52,9 @@ namespace detectionx {
     void Pipeline::detect_thread() const {
         while (!stopped_ && !decoder_->is_released()) {
             std::shared_ptr<vcodecx::FrameX> framex{};
-            if (!decoder_->read(framex, -1)) continue;
+            if (!decoder_->read(framex, 10)) {
+                continue;
+            }
 
             cv::Mat image(cv::Size(framex->width, framex->height), CV_8UC3, framex->ptr);
             const auto fut = detector_->commit(image);
@@ -86,8 +88,8 @@ namespace detectionx {
                 );
             }
 
-            recorder_.write(image);
-            // encoder_->write(task.framex, 3);
+            // recorder_.write(image);
+            encoder_->write(task.framex, 10);
         }
     }
 
@@ -100,10 +102,9 @@ namespace detectionx {
     }
 
     void Pipeline::shutdown() {
-        detection_queue_->release();
+        if (detection_queue_) detection_queue_->release();
 
         if (detect_thread_.joinable()) detect_thread_.join();
-
         if (process_thread_.joinable()) process_thread_.join();
 
         if (decoder_) decoder_->release();
@@ -175,7 +176,7 @@ namespace detectionx {
         const vcodecx::StreamInfo stream_info{task_config_.id, task_config_.uri};
 
         const vcodecx::DecodeConfig decode_cfg{
-            width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 100
+            width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 10
         };
         decoder_ = codec_manager_->create_decoder(stream_info, decode_cfg);
         if (!decoder_) {
@@ -184,7 +185,7 @@ namespace detectionx {
         }
 
         const vcodecx::EncodeConfig encode_cfg{
-            width, height, vcodecx::WorkerMode::Callback, fps, 100, vcodecx::CodecType::H265
+            width, height, vcodecx::WorkerMode::Callback, fps, 10, vcodecx::CodecType::H265
         };
         encoder_ = codec_manager_->create_encoder(encode_cfg);
         if (!encoder_) {
