@@ -36,7 +36,7 @@ namespace detectionx {
 
         init_region();
 
-        detection_queue_ = std::make_shared<toolkitx::concurrent::BlockingQueue<DetectionTask> >(50);
+        detection_queue_ = std::make_shared<toolkitx::concurrent::BlockingQueue<DetectionTask> >(30);
 
         stopped_.store(false);
 
@@ -52,19 +52,19 @@ namespace detectionx {
     void Pipeline::detect_thread() const {
         while (!stopped_ && !decoder_->is_released()) {
             std::shared_ptr<vcodecx::FrameX> framex{};
-            if (!decoder_->read(framex, 100)) continue;
+            if (!decoder_->read(framex, -1)) continue;
 
             cv::Mat image(cv::Size(framex->width, framex->height), CV_8UC3, framex->ptr);
             const auto fut = detector_->commit(image);
 
-            detection_queue_->push({framex, fut}, 100);
+            detection_queue_->push({framex, fut});
         }
     }
 
     void Pipeline::process_thread() {
         DetectionTask task{};
         while (!stopped_ && !decoder_->is_released()) {
-            if (!detection_queue_->pop(task, 100)) continue;
+            if (!detection_queue_->pop(task)) continue;
 
             cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
@@ -96,11 +96,12 @@ namespace detectionx {
 
         shutdown();
 
-        recorder_.stop();
         LOG_INFO("pipeline", "pipeline %s stopped", task_config_.id.c_str());
     }
 
     void Pipeline::shutdown() {
+        detection_queue_->release();
+
         if (detect_thread_.joinable()) detect_thread_.join();
 
         if (process_thread_.joinable()) process_thread_.join();
