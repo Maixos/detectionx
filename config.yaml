@@ -54,23 +54,23 @@ tasks:
 #      type: polygon
 #      values: [ [423, 398], [730, 392], [1045, 616], [190, 630] ]
 
-  - id: cam00004
-    uri: /home/firefly/Videos/4.mp4
-    region:
-      type: polygon
-      values: [ [423, 398], [730, 392], [1045, 616], [190, 630] ]
+#  - id: cam00004
+#    uri: /home/firefly/Videos/4.mp4
+#    region:
+#      type: polygon
+#      values: [ [184, 182], [783, 190], [1000, 352], [9, 380] ]
 
 #  - id: cam00005
 #    uri: /home/firefly/Videos/5.mp4
 #    region:
 #      type: polygon
-#      values: [ 0.2, 0.2, 0.2, 0.2 ]
-#
-#  - id: cam00006
-#    uri: /home/firefly/Videos/6.mp4
-#    region:
-#      type: polygon
-#      values: [ 0.2, 0.2, 0.2, 0.2 ]
+#      values: [ [380, 340], [925, 346], [1275, 545], [1275, 648], [3, 648], [3, 513] ]
+
+  - id: cam00006
+    uri: /home/firefly/Videos/6.mp4
+    region:
+      type: polygon
+      values: [ [114, 138], [828, 140], [1275, 545], [1275, 648], [3, 648], [5, 195] ]
 
 #  - id: cam00002
 #    uri: /dev/video1

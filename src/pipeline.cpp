@@ -80,6 +80,9 @@ namespace detectionx {
                 );
             }
 
+            cv::imshow(task_config_.id, image);
+            cv::waitKey(1);
+
             encoder_->write(task.framex, 3);
         }
     }
