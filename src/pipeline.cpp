@@ -25,6 +25,10 @@ namespace detectionx {
             return true;
         }
 
+        const auto &gcfg = GConfig::get_instance();
+        video_width_ = gcfg.rtsp_config_.width;
+        video_height_ = gcfg.rtsp_config_.height;
+
         if (!init_codec()) {
             shutdown();
             return false;
@@ -32,12 +36,14 @@ namespace detectionx {
 
         init_region();
 
-        detection_queue_ = std::make_shared<toolkitx::concurrent::BlockingQueue<DetectionTask> >(10);
+        detection_queue_ = std::make_shared<toolkitx::concurrent::BlockingQueue<DetectionTask> >(50);
 
         stopped_.store(false);
 
         detect_thread_ = std::thread(&Pipeline::detect_thread, this);
         process_thread_ = std::thread(&Pipeline::process_thread, this);
+
+        recorder_.start("runs/" + task_config_.id + ".mp4", video_width_, video_height_, 30);
 
         LOG_INFO("pipeline", "pipeline %s started", task_config_.id.c_str());
         return true;
@@ -46,19 +52,19 @@ namespace detectionx {
     void Pipeline::detect_thread() const {
         while (!stopped_ && !decoder_->is_released()) {
             std::shared_ptr<vcodecx::FrameX> framex{};
-            if (!decoder_->read(framex, 10)) continue;
+            if (!decoder_->read(framex, 100)) continue;
 
             cv::Mat image(cv::Size(framex->width, framex->height), CV_8UC3, framex->ptr);
             const auto fut = detector_->commit(image);
 
-            detection_queue_->push({framex, fut}, 10);
+            detection_queue_->push({framex, fut}, 100);
         }
     }
 
-    void Pipeline::process_thread() const {
+    void Pipeline::process_thread() {
         DetectionTask task{};
         while (!stopped_ && !decoder_->is_released()) {
-            if (!detection_queue_->pop(task, 10)) continue;
+            if (!detection_queue_->pop(task, 100)) continue;
 
             cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
@@ -80,10 +86,8 @@ namespace detectionx {
                 );
             }
 
-            cv::imshow(task_config_.id, image);
-            cv::waitKey(1);
-
-            encoder_->write(task.framex, 3);
+            recorder_.write(image);
+            // encoder_->write(task.framex, 3);
         }
     }
 
@@ -92,6 +96,7 @@ namespace detectionx {
 
         shutdown();
 
+        recorder_.stop();
         LOG_INFO("pipeline", "pipeline %s stopped", task_config_.id.c_str());
     }
 
@@ -105,11 +110,9 @@ namespace detectionx {
     }
 
     bool Pipeline::init_region() {
-        const auto &gcfg = GConfig::get_instance();
-        const int width = gcfg.rtsp_config_.width;
-        const int height = gcfg.rtsp_config_.height;
-
-        region_ = vision::Region(cv::Rect(0, 0, width, height), width, height);
+        region_ = vision::Region(
+            cv::Rect(0, 0, video_width_, video_height_), video_width_, video_height_
+        );
 
         if (task_config_.type == "xyxy") {
             if (task_config_.values.size() == 4) {
@@ -117,7 +120,7 @@ namespace detectionx {
                 const auto y1 = task_config_.values[1];
                 const auto x2 = task_config_.values[2];
                 const auto y2 = task_config_.values[3];
-                region_ = vision::Region(cv::Rect2f(x1, y1, x2 - x1, y2 - y1), width, height);
+                region_ = vision::Region(cv::Rect2f(x1, y1, x2 - x1, y2 - y1), video_width_, video_height_);
             } else {
                 LOG_WARN("pipeline", "xyxy region expects 4 values");
             }
@@ -130,7 +133,7 @@ namespace detectionx {
                         task_config_.values[i + 1]
                     );
                 }
-                region_ = vision::Region(pts, width, height);
+                region_ = vision::Region(pts, video_width_, video_height_);
             } else {
                 LOG_WARN("pipeline", "invalid polygon region config");
             }
@@ -147,12 +150,12 @@ namespace detectionx {
                         "pipeline", "invalid ratio padding: [%.2f, %.2f, %.2f, %.2f]", l, t, r, b
                     );
                 } else {
-                    const auto x1 = l * width;
-                    const auto y1 = t * height;
-                    const auto x2 = (1.f - r) * width;
-                    const auto y2 = (1.f - b) * height;
+                    const auto x1 = l * video_width_;
+                    const auto y1 = t * video_height_;
+                    const auto x2 = (1.f - r) * video_width_;
+                    const auto y2 = (1.f - b) * video_height_;
 
-                    region_ = vision::Region(cv::Rect2f(x1, y1, x2 - x1, y2 - y1), width, height);
+                    region_ = vision::Region(cv::Rect2f(x1, y1, x2 - x1, y2 - y1), video_width_, video_height_);
                 }
             } else {
                 LOG_WARN("pipeline", "ratio region expects 4 values");
@@ -171,7 +174,7 @@ namespace detectionx {
         const vcodecx::StreamInfo stream_info{task_config_.id, task_config_.uri};
 
         const vcodecx::DecodeConfig decode_cfg{
-            width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 3
+            width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 100
         };
         decoder_ = codec_manager_->create_decoder(stream_info, decode_cfg);
         if (!decoder_) {
@@ -180,7 +183,7 @@ namespace detectionx {
         }
 
         const vcodecx::EncodeConfig encode_cfg{
-            width, height, vcodecx::WorkerMode::Callback, fps, 3, vcodecx::CodecType::H265
+            width, height, vcodecx::WorkerMode::Callback, fps, 100, vcodecx::CodecType::H265
         };
         encoder_ = codec_manager_->create_encoder(encode_cfg);
         if (!encoder_) {

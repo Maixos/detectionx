@@ -8,6 +8,7 @@
 #include <inferencex/engines/detection/yolo11.h>
 
 #include "config.h"
+#include "video_recoder.h"
 
 namespace detectionx {
     struct DetectionTask {
@@ -42,7 +43,7 @@ namespace detectionx {
 
         void detect_thread() const;
 
-        void process_thread() const;
+        void process_thread();
 
         bool init_region();
 
@@ -62,8 +63,11 @@ namespace detectionx {
         vision::Region region_{};
         std::atomic<bool> stopped_{true};
 
+        int video_width_{0};
+        int video_height_{0};
         std::thread detect_thread_{};
         std::thread process_thread_{};
+        VideoRecorder recorder_{};
         std::shared_ptr<vcodecx::Decoder> decoder_{};
         std::shared_ptr<vcodecx::Encoder> encoder_{};
 
