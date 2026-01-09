@@ -10,9 +10,11 @@ _DetectionX 提供高效的边缘多路视频流 AI 视频分析，支持 YOLO �
 # 🎬 Demo | 演示
 
 ## 相关链接[
-+ Bilibili：https://www.bilibili.com/video/BV1LirPBzEeS/?spm_id_from=333.1387.homepage.video_card.click&vd_source=cf873886c731eb05ae070722ce19f5dc  ](https://www.bilibili.com/video/BV1LirPBzEeS/?spm_id_from=333.1387.homepage.video_card.click&vd_source=cf873886c731eb05ae070722ce19f5dc)
+- [Bilibili 视频](https://www.bilibili.com/video/BV1LirPBzEeS/?spm_id_from=333.1387.homepage.video_card.click&vd_source=cf873886c731eb05ae070722ce19f5dc)
 
-![Demo](asset/videos/detectionx_demo.mp4)
+<video width="480" controls>
+  <source src="asset/videos/detectionx_demo.mp4" type="video/mp4">
+</video>
 
 # ⚙️ Core Features | 核心特性
 ## Efficient Detection | 高效检测
