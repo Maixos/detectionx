@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
     const int num_workers = g_config.detection_config_.num_workers;
     const std::string model_path = g_config.detection_config_.model_path;
     const float threshold = g_config.detection_config_.threshold;
-    const auto detector = inferencex::detection::YOLO11Engine::create(
+    const auto detector = inferencex::detection::YOLO5Engine::create(
         model_path, threshold, num_workers
     );
     if (!detector) {

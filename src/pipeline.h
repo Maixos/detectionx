@@ -5,7 +5,7 @@
 #include <vcodecx/manager.h>
 #include <toolkitx/vision/region.h>
 #include <toolkitx/concurrent/queuex.h>
-#include <inferencex/engines/detection/yolo11.h>
+#include <inferencex/engines/detection/yolo5.h>
 
 #include "config.h"
 #include "video_recoder.h"
@@ -20,7 +20,7 @@ namespace detectionx {
     public:
         explicit Pipeline(
             TaskConfig task_config,
-            const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults>>& detector,
+            const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults>>& detector,
             const std::shared_ptr<vcodecx::Manager>& codec_manager,
             const std::shared_ptr<rtspx::MediaSession>& rtsp_session,
             const std::shared_ptr<mqttx::Client>& mqtt_client
@@ -32,7 +32,7 @@ namespace detectionx {
 
         static std::shared_ptr<Pipeline> create(
             const TaskConfig& task_config,
-            const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults>>& detector,
+            const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults>>& detector,
             const std::shared_ptr<vcodecx::Manager>& codec_manager,
             const std::shared_ptr<rtspx::MediaSession>& rtsp_session,
             const std::shared_ptr<mqttx::Client>& mqtt_client
@@ -41,7 +41,7 @@ namespace detectionx {
     private:
         bool startup();
 
-        void detect_thread() const;
+        void detect_thread();
 
         void process_thread();
 
@@ -55,7 +55,7 @@ namespace detectionx {
 
     private:
         TaskConfig task_config_{};
-        std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults>> detector_{};
+        std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults>> detector_{};
         std::shared_ptr<vcodecx::Manager> codec_manager_{};
         std::shared_ptr<rtspx::MediaSession> rtsp_session_{};
         std::shared_ptr<mqttx::Client> mqtt_client_{};
@@ -71,6 +71,6 @@ namespace detectionx {
         std::shared_ptr<vcodecx::Decoder> decoder_{};
         std::shared_ptr<vcodecx::Encoder> encoder_{};
 
-        std::shared_ptr<toolkitx::concurrent::BlockingQueue<DetectionTask>> detection_queue_{};
+        std::shared_ptr<toolkitx::concurrent::QueueX<DetectionTask> > detection_queue_{};
     };
 }

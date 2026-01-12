@@ -7,7 +7,7 @@
 namespace detectionx {
     Pipeline::Pipeline(
         TaskConfig task_config,
-        const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults> > &detector,
+        const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults> > &detector,
         const std::shared_ptr<vcodecx::Manager> &codec_manager,
         const std::shared_ptr<rtspx::MediaSession> &rtsp_session,
         const std::shared_ptr<mqttx::Client> &mqtt_client
@@ -43,34 +43,38 @@ namespace detectionx {
         detect_thread_ = std::thread(&Pipeline::detect_thread, this);
         process_thread_ = std::thread(&Pipeline::process_thread, this);
 
-        recorder_.start("runs/" + task_config_.id + ".mp4", video_width_, video_height_, 30);
+        // recorder_.start("runs/" + task_config_.id + ".mp4", video_width_, video_height_, 30);
 
         LOG_INFO("pipeline", "pipeline %s started", task_config_.id.c_str());
         return true;
     }
 
-    void Pipeline::detect_thread() const {
+    void Pipeline::detect_thread() {
         while (!stopped_ && !decoder_->is_released()) {
             std::shared_ptr<vcodecx::FrameX> framex{};
-            if (!decoder_->read(framex, 10)) {
+
+            // TODO FIX
+            if (!decoder_->read(framex, -1)) {
                 continue;
             }
 
-            cv::Mat image(cv::Size(framex->width, framex->height), CV_8UC3, framex->ptr);
-            const auto fut = detector_->commit(image);
+            auto imagex = inferencex::ImageX::from_device(
+                framex->fd, framex->ptr, framex->width, framex->height, framex->width * 3, framex
+            );
+            const auto fut = detector_->commit(imagex);
 
-            detection_queue_->push({framex, fut});
+            detection_queue_->push({framex, fut}, 10);
         }
     }
 
     void Pipeline::process_thread() {
         DetectionTask task{};
         while (!stopped_ && !decoder_->is_released()) {
-            if (!detection_queue_->pop(task)) continue;
+            if (!detection_queue_->pop(task, 10)) continue;
 
             cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
-            region_.draw(image, 0.1, 1);
+            // region_.draw(image, 0.1, 1);
 
             auto results = task.handle.get();
             for (const auto &det: results) {
@@ -215,7 +219,7 @@ namespace detectionx {
 
     std::shared_ptr<Pipeline> Pipeline::create(
         const TaskConfig &task_config,
-        const std::shared_ptr<inferencex::InferenceX<cv::Mat, inferencex::Detection2DResults> > &detector,
+        const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults> > &detector,
         const std::shared_ptr<vcodecx::Manager> &codec_manager,
         const std::shared_ptr<rtspx::MediaSession> &rtsp_session,
         const std::shared_ptr<mqttx::Client> &mqtt_client

@@ -5,8 +5,8 @@ project:
   describe: ""
 
 detection:
-  model_path: "asset/models/detection/yolo11/coco/rk3588/detection_yolo11s_coco_int8.rknn"
-  num_workers: 1
+  model_path: "asset/models/detection/yolo5/coco/rk3588/detection_yolo5s_coco_int8.rknn"
+  num_workers: 8
   threshold: 0.6
   classes:
 
@@ -42,35 +42,35 @@ tasks:
       type: polygon
       values: [ [280, 340], [860, 342], [1350, 610], [3, 628], [3, 495], [14, 491] ]
 
-#  - id: cam00002
-#    uri: /home/firefly/Videos/2.mp4
-#    region:
-#      type: polygon
-#      values: [ [233, 300], [1000, 296], [1276, 440], [1276, 600], [3, 560], [3, 425] ]
+  - id: cam00002
+    uri: /home/firefly/Videos/2.mp4
+    region:
+      type: polygon
+      values: [ [233, 300], [1000, 296], [1276, 440], [1276, 600], [3, 560], [3, 425] ]
 
-#  - id: cam00003
-#    uri: /home/firefly/Videos/3.mp4
-#    region:
-#      type: polygon
-#      values: [ [423, 398], [730, 392], [1045, 616], [190, 630] ]
+  - id: cam00003
+    uri: /home/firefly/Videos/3.mp4
+    region:
+      type: polygon
+      values: [ [423, 398], [730, 392], [1045, 616], [190, 630] ]
 
-#  - id: cam00004
-#    uri: /home/firefly/Videos/4.mp4
-#    region:
-#      type: polygon
-#      values: [ [184, 182], [783, 190], [1000, 352], [9, 380] ]
+  - id: cam00004
+    uri: /home/firefly/Videos/4.mp4
+    region:
+      type: polygon
+      values: [ [184, 182], [783, 190], [1000, 352], [9, 380] ]
 
-#  - id: cam00005
-#    uri: /home/firefly/Videos/5.mp4
-#    region:
-#      type: polygon
-#      values: [ [380, 340], [925, 346], [1275, 545], [1275, 648], [3, 648], [3, 513] ]
+  - id: cam00005
+    uri: /home/firefly/Videos/5.mp4
+    region:
+      type: polygon
+      values: [ [380, 340], [925, 346], [1275, 545], [1275, 648], [3, 648], [3, 513] ]
 
-#  - id: cam00006
-#    uri: /home/firefly/Videos/6.mp4
-#    region:
-#      type: polygon
-#      values: [ [114, 138], [828, 140], [1275, 545], [1275, 648], [3, 648], [5, 195] ]
+  - id: cam00006
+    uri: /home/firefly/Videos/6.mp4
+    region:
+      type: polygon
+      values: [ [114, 138], [828, 140], [1275, 545], [1275, 648], [3, 648], [5, 195] ]
 
 #  - id: cam00002
 #    uri: /dev/video1
