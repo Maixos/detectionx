@@ -65,7 +65,7 @@ namespace detectionx {
                 case IoStatus::Closed:
                 case IoStatus::Released:
                 case IoStatus::Error:
-                    stopped_.store(true);
+                    // stopped_.store(true);
                     if (detection_queue_) detection_queue_->close();
                     return;   // 解码结束/释放/错误：退出线程
             }
@@ -75,7 +75,10 @@ namespace detectionx {
             );
 
             const auto fut = detector_->commit(imagex);
-            detection_queue_->push({framex, fut}, 10);
+            if (!detection_queue_->push({framex, fut}, 10)) {
+                // 队列已 close/release
+                if (stopped_) break;
+            }
         }
     }
 
@@ -105,24 +108,23 @@ namespace detectionx {
             }
 
             // recorder_.write(image);
-            encoder_->write(task.framex, 10);
+            const auto st = encoder_->write(task.framex, 10);
+            if (st != IoStatus::Ok && st != IoStatus::Timeout) {
+                stopped_.store(true);
+                break;
+            }
         }
     }
 
     void Pipeline::release() {
-        // 先发退出信号
-        stopped_.store(true);
+        if (stopped_.exchange(true)) return;
 
-        // 先释放会阻塞的源头，唤醒 detect_thread
-        if (decoder_) decoder_->release();
-
-        // 释放队列，唤醒 process_thread
         if (detection_queue_) detection_queue_->release();
 
-        // join
         if (detect_thread_.joinable()) detect_thread_.join();
         if (process_thread_.joinable()) process_thread_.join();
 
+        if (decoder_) decoder_->release();
         if (encoder_) encoder_->release();
 
         LOG_INFO("pipeline", "pipeline %s stopped", task_config_.id.c_str());
@@ -190,9 +192,9 @@ namespace detectionx {
         const int height = gcfg.rtsp_config_.height;
         constexpr int fps = 30;
 
-        const vcodecx::StreamInfo stream_info{task_config_.id, task_config_.uri};
+        const StreamInfo stream_info{task_config_.id, task_config_.uri};
 
-        const vcodecx::DecodeConfig decode_cfg{
+        const DecodeConfig decode_cfg{
             width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 10
         };
         decoder_ = codec_manager_->create_decoder(stream_info, decode_cfg);
@@ -218,7 +220,7 @@ namespace detectionx {
     }
 
     void Pipeline::on_encoded(const std::shared_ptr<vcodecx::EncodedX> &encodedx) const {
-        if (encodedx->size == 0) return;
+        if (stopped_ || encodedx->size == 0) return;
 
         rtspx::EncodedShared packet{};
         packet.frame_type = encodedx->is_keyframe ? rtspx::VIDEO_FRAME_I : rtspx::VIDEO_FRAME_P;
