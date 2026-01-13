@@ -22,10 +22,12 @@ namespace detectionx {
     }
 
     bool Pipeline::startup() {
-        if (!stopped_.load()) {
+        if (!stopped_.load(std::memory_order_acquire)) {
             LOG_WARN("pipeline", "pipeline already started");
             return true;
         }
+
+        released_.store(false, std::memory_order_release);
 
         const auto &gcfg = GConfig::get_instance();
         video_width_ = gcfg.rtsp_config_.width;
@@ -40,7 +42,7 @@ namespace detectionx {
 
         detection_queue_ = std::make_shared<toolkitx::concurrent::BlockingQueue<DetectionTask> >(30);
 
-        stopped_.store(false);
+        stopped_.store(false, std::memory_order_release);
 
         detect_thread_ = std::thread(&Pipeline::detect_thread, this);
         process_thread_ = std::thread(&Pipeline::process_thread, this);
@@ -52,22 +54,19 @@ namespace detectionx {
     }
 
     void Pipeline::detect_thread() {
-        while (!stopped_) {
+        while (!stopped_.load(std::memory_order_acquire)) {
             std::shared_ptr<FrameX> framex{};
 
             const auto st = decoder_->read(framex, -1);
-            switch (st) {
-                case IoStatus::Ok:
-                    break; // 继续往下处理 framex
+            if (st != IoStatus::Ok) {
+                if (st == IoStatus::Timeout) {
+                    continue;
+                }
 
-                case IoStatus::Timeout:
-                    continue; // 进入下一轮 while，仅当 timeout>=0 时才可能走到
-                case IoStatus::Closed:
-                case IoStatus::Released:
-                case IoStatus::Error:
-                    stopped_.store(true);
-                    if (detection_queue_) detection_queue_->close();
-                    return;   // 解码结束/释放/错误：退出线程
+                // 终止：通知下游退出
+                stopped_.store(true, std::memory_order_release);
+                if (detection_queue_) detection_queue_->release();
+                return;
             }
 
             auto imagex = inferencex::ImageX::from_device(
@@ -75,17 +74,22 @@ namespace detectionx {
             );
 
             const auto fut = detector_->commit(imagex);
-            if (!detection_queue_->push({framex, fut}, 10)) {
-                // 队列已 close/release
-                if (stopped_) break;
+            if (!detection_queue_ || !detection_queue_->push({framex, fut}, 10)) {
+                // 队列已 release/close 或异常：直接退出
+                stopped_.store(true, std::memory_order_release);
+                return;
             }
         }
     }
 
     void Pipeline::process_thread() {
         DetectionTask task{};
-        while (!stopped_) {
-            if (!detection_queue_->pop(task, -1)) break;
+        while (!stopped_.load(std::memory_order_acquire)) {
+            if (!detection_queue_ || !detection_queue_->pop(task, -1)) break;
+
+            if (task.handle.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready) {
+                continue;
+            }
 
             cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
@@ -111,14 +115,15 @@ namespace detectionx {
             const auto st = encoder_->write(task.framex, 10);
             if (st != IoStatus::Ok && st != IoStatus::Timeout) {
                 stopped_.store(true);
-                break;
+                return;
             }
         }
     }
 
     void Pipeline::release() {
-        if (released_.exchange(true)) return;
-        stopped_.store(true);
+        if (released_.exchange(true, std::memory_order_acq_rel)) return;
+
+        stopped_.store(true, std::memory_order_release);
 
         // 先停下游，避免继续消费/写入
         if (detection_queue_) detection_queue_->release();
@@ -198,7 +203,7 @@ namespace detectionx {
         const StreamInfo stream_info{task_config_.id, task_config_.uri};
 
         const DecodeConfig decode_cfg{
-            width, height, vcodecx::ImageFormat::BGR24, vcodecx::WorkerMode::Polling, fps, 10
+            width, height, ImageFormat::BGR24, WorkerMode::Polling, fps, 10
         };
         decoder_ = codec_manager_->create_decoder(stream_info, decode_cfg);
         if (!decoder_) {
@@ -206,8 +211,8 @@ namespace detectionx {
             return false;
         }
 
-        const vcodecx::EncodeConfig encode_cfg{
-            width, height, vcodecx::WorkerMode::Callback, fps, 10, vcodecx::CodecType::H265
+        const EncodeConfig encode_cfg{
+            width, height, WorkerMode::Callback, fps, 10, CodecType::H265
         };
         encoder_ = codec_manager_->create_encoder(encode_cfg);
         if (!encoder_) {
@@ -222,8 +227,9 @@ namespace detectionx {
         return true;
     }
 
-    void Pipeline::on_encoded(const std::shared_ptr<vcodecx::EncodedX> &encodedx) const {
-        if (stopped_ || encodedx->size == 0) return;
+    void Pipeline::on_encoded(const std::shared_ptr<EncodedX> &encodedx) const {
+        if (!encodedx || encodedx->size == 0) return;
+        if (stopped_.load(std::memory_order_acquire)) return;
 
         rtspx::EncodedShared packet{};
         packet.frame_type = encodedx->is_keyframe ? rtspx::VIDEO_FRAME_I : rtspx::VIDEO_FRAME_P;
@@ -238,7 +244,7 @@ namespace detectionx {
     std::shared_ptr<Pipeline> Pipeline::create(
         const TaskConfig &task_config,
         const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults> > &detector,
-        const std::shared_ptr<vcodecx::Manager> &codec_manager,
+        const std::shared_ptr<Manager> &codec_manager,
         const std::shared_ptr<rtspx::MediaSession> &rtsp_session,
         const std::shared_ptr<mqttx::Client> &mqtt_client
     ) {

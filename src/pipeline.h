@@ -60,10 +60,10 @@ namespace detectionx {
 
         vision::Region region_{};
         std::atomic<bool> stopped_{true};
-        std::atomic<bool> released_{false};
+        std::atomic<bool> released_{true};
 
-        int video_width_{0};
-        int video_height_{0};
+        int video_width_{};
+        int video_height_{};
         std::thread detect_thread_{};
         std::thread process_thread_{};
         VideoRecorder recorder_{};
