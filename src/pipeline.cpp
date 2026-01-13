@@ -125,7 +125,7 @@ namespace detectionx {
 
         stopped_.store(true, std::memory_order_release);
 
-        // 先停下游，避免继续消费/写入
+        // 先停下游：确保所有使用上游 FrameX 等资源的线程已退出，防止上游释放资源后下游继续访问导致内存破坏。
         if (detection_queue_) detection_queue_->release();
         if (process_thread_.joinable()) process_thread_.join();
 
