@@ -77,6 +77,7 @@ namespace detectionx {
             if (!detection_queue_ || !detection_queue_->push({framex, fut}, 10)) {
                 // 队列已 release/close 或异常：直接退出
                 stopped_.store(true, std::memory_order_release);
+                if (detection_queue_) detection_queue_->release();
                 return;
             }
         }
@@ -87,34 +88,33 @@ namespace detectionx {
         while (!stopped_.load(std::memory_order_acquire)) {
             if (!detection_queue_ || !detection_queue_->pop(task, -1)) break;
 
-            if (task.handle.wait_for(std::chrono::milliseconds(50)) != std::future_status::ready) {
-                continue;
-            }
+            if (task.handle.wait_for(std::chrono::milliseconds(50)) == std::future_status::ready) {
+                cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
-            cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
+                // region_.draw(image, 0.1, 1);
 
-            // region_.draw(image, 0.1, 1);
+                auto results = task.handle.get();
+                for (const auto &det: results) {
+                    if (!region_.contains(det.bbox.rect)) continue;
 
-            auto results = task.handle.get();
-            for (const auto &det: results) {
-                if (!region_.contains(det.bbox.rect)) continue;
-
-                auto color = vision::id_to_color(det.class_id);
-                cv::rectangle(image, det.bbox.rect, color, 2);
-                cv::circle(image, cv::Point2f(det.bbox.cx(), det.bbox.cy()), 3, color, cv::FILLED);
-                char text[64];
-                snprintf(text, sizeof(text), "%s %.2f", std::to_string(det.class_id).c_str(), det.score);
-                cv::putText(
-                    image, text, cv::Point2f(det.bbox.x1(), det.bbox.y1() - 5.f),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.6,
-                    color, 1, cv::LINE_AA
-                );
+                    auto color = vision::id_to_color(det.class_id);
+                    cv::rectangle(image, det.bbox.rect, color, 2);
+                    cv::circle(image, cv::Point2f(det.bbox.cx(), det.bbox.cy()), 3, color, cv::FILLED);
+                    char text[64];
+                    snprintf(text, sizeof(text), "%s %.2f", std::to_string(det.class_id).c_str(), det.score);
+                    cv::putText(
+                        image, text, cv::Point2f(det.bbox.x1(), det.bbox.y1() - 5.f),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.6,
+                        color, 1, cv::LINE_AA
+                    );
+                }
             }
 
             // recorder_.write(image);
             const auto st = encoder_->write(task.framex, 10);
             if (st != IoStatus::Ok && st != IoStatus::Timeout) {
                 stopped_.store(true);
+                if (detection_queue_) detection_queue_->release();
                 return;
             }
         }
