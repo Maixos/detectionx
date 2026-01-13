@@ -5,6 +5,8 @@
 #include <toolkitx/vision/visualization.h>
 
 namespace detectionx {
+    using namespace vcodecx;
+
     Pipeline::Pipeline(
         TaskConfig task_config,
         const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults> > &detector,
@@ -50,27 +52,35 @@ namespace detectionx {
     }
 
     void Pipeline::detect_thread() {
-        while (!stopped_ && !decoder_->is_released()) {
-            std::shared_ptr<vcodecx::FrameX> framex{};
+        while (!stopped_) {
+            std::shared_ptr<FrameX> framex{};
 
-            // TODO FIX
-            if (!decoder_->read(framex, -1)) {
-                continue;
+            const auto st = decoder_->read(framex, -1);
+            switch (st) {
+                case IoStatus::Ok:
+                    break; // 继续往下处理 framex
+
+                case IoStatus::Timeout:
+                    continue; // 进入下一轮 while，仅当 timeout>=0 时才可能走到
+                case IoStatus::Closed:
+                case IoStatus::Released:
+                case IoStatus::Error:
+                    return;   // 解码结束/释放/错误：退出线程
             }
 
             auto imagex = inferencex::ImageX::from_device(
                 framex->fd, framex->ptr, framex->width, framex->height, framex->width * 3, framex
             );
-            const auto fut = detector_->commit(imagex);
 
+            const auto fut = detector_->commit(imagex);
             detection_queue_->push({framex, fut}, 10);
         }
     }
 
     void Pipeline::process_thread() {
         DetectionTask task{};
-        while (!stopped_ && !decoder_->is_released()) {
-            if (!detection_queue_->pop(task, 10)) continue;
+        while (!stopped_) {
+            if (!detection_queue_->pop(task, -1)) break;
 
             cv::Mat image(cv::Size(task.framex->width, task.framex->height), CV_8UC3, task.framex->ptr);
 
