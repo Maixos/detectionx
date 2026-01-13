@@ -65,7 +65,7 @@ namespace detectionx {
                 case IoStatus::Closed:
                 case IoStatus::Released:
                 case IoStatus::Error:
-                    // stopped_.store(true);
+                    stopped_.store(true);
                     if (detection_queue_) detection_queue_->close();
                     return;   // 解码结束/释放/错误：退出线程
             }
@@ -117,14 +117,17 @@ namespace detectionx {
     }
 
     void Pipeline::release() {
-        if (stopped_.exchange(true)) return;
+        if (released_.exchange(true)) return;
+        stopped_.store(true);
 
+        // 先停下游，避免继续消费/写入
         if (detection_queue_) detection_queue_->release();
-
-        if (detect_thread_.joinable()) detect_thread_.join();
         if (process_thread_.joinable()) process_thread_.join();
 
+        // 再停上游，唤醒 read(-1)
         if (decoder_) decoder_->release();
+        if (detect_thread_.joinable()) detect_thread_.join();
+
         if (encoder_) encoder_->release();
 
         LOG_INFO("pipeline", "pipeline %s stopped", task_config_.id.c_str());

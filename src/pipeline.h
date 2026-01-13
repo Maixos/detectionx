@@ -60,6 +60,7 @@ namespace detectionx {
 
         vision::Region region_{};
         std::atomic<bool> stopped_{true};
+        std::atomic<bool> released_{false};
 
         int video_width_{0};
         int video_height_{0};
