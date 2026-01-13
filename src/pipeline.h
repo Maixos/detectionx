@@ -49,8 +49,6 @@ namespace detectionx {
 
         bool init_codec();
 
-        void shutdown();
-
         void on_encoded(const std::shared_ptr<vcodecx::EncodedX>& encodedx) const;
 
     private:
