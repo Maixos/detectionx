@@ -4,6 +4,7 @@
 #include <csignal>
 
 #include <toolkitx/logx/logx.h>
+#include <inferencex/engines/detection/yolo5.h>
 
 #include "config.h"
 #include "pipeline.h"
@@ -30,21 +31,20 @@ int main(int argc, char* argv[]) {
     /// ----------------------------------------
     GConfig& g_config = GConfig::get_instance();
     if (!g_config.load("config.yaml")) {
-        LOG_ERROR("test", "load config.yaml failed");
+        LOG_ERROR("detectionx", "load config.yaml failed");
         return -1;
     }
 
     /// ----------------------------------------
     ///                 DETECTION
     /// ----------------------------------------
-    const int num_workers = g_config.detection_config_.num_workers;
+    const auto num_streams = static_cast<int>(g_config.task_configs_.size());
+    const int num_workers = std::max(num_streams, g_config.detection_config_.num_workers);
     const std::string model_path = g_config.detection_config_.model_path;
     const float threshold = g_config.detection_config_.threshold;
-    const auto detector = inferencex::detection::YOLO5Engine::create(
-        model_path, threshold, num_workers
-    );
+    const auto detector = inferencex::detection::YOLO5Engine::create(model_path, threshold, num_workers);
     if (!detector) {
-        LOG_ERROR("test", "create engine failed");
+        LOG_ERROR("detectionx", "create engine failed");
         return -1;
     }
 
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
     /// ----------------------------------------
     const auto rtsp_server = rtspx::RtspServer::create();
     if (!rtsp_server->start("0.0.0.0", g_config.rtsp_config_.port)) {
-        LOG_ERROR("test", "start rtsp server failed");
+        LOG_ERROR("detectionx", "start rtsp server failed");
         return -1;
     }
 
@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
         mqttx_client = mqttx::Client::create(client_id, ip, port);
         if (!mqttx_client) {
             LOG_ERROR(
-                "test", "MQTT connection failed. Please check your MQTT configuration: ip=%s, port=%s",
+                "detectionx", "MQTT connection failed. Please check your MQTT configuration: ip=%s, port=%s",
                 ip.c_str(), port.c_str()
             );
             return -1;
@@ -81,11 +81,11 @@ int main(int argc, char* argv[]) {
     std::vector<std::shared_ptr<Pipeline>> task_pipelines;
     const auto codec_manager = vcodecx::Manager::instance();
     for (const auto& task_config : g_config.task_configs_) {
-        LOG_INFO("test", "loaded task config: %s", task_config.to_string().c_str());
+        LOG_INFO("detectionx", "loaded task config: %s", task_config.to_string().c_str());
         const std::string suffix = g_config.rtsp_config_.suffix + "/" + task_config.id;
         auto rtsp_session = rtsp_server->add_session(suffix);
         if (!rtsp_session) {
-            LOG_WARN("test", "create rtsp session failed");
+            LOG_WARN("detectionx", "create rtsp session failed");
             continue;
         }
 
@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
             task_config, detector, codec_manager, rtsp_session, mqttx_client
         );
         if (!task) {
-            LOG_WARN("test", "create task failed");
+            LOG_WARN("detectionx", "create task failed");
             continue;
         }
 

@@ -3,9 +3,9 @@
 #include <rtspx/rtspx.h>
 #include <mqttx/client.h>
 #include <vcodecx/manager.h>
+#include <inferencex/types.h>
 #include <toolkitx/vision/region.h>
 #include <toolkitx/concurrent/queuex.h>
-#include <inferencex/engines/detection/yolo5.h>
 
 #include "config.h"
 #include "video_recoder.h"
