@@ -9,8 +9,8 @@ namespace detectionx {
 
     Pipeline::Pipeline(
         TaskConfig task_config,
-        const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults> > &detector,
-        const std::shared_ptr<vcodecx::Manager> &codec_manager,
+        const std::shared_ptr<inferencex::detection::DetectionEngine> &detector,
+        const std::shared_ptr<Manager> &codec_manager,
         const std::shared_ptr<rtspx::MediaSession> &rtsp_session,
         const std::shared_ptr<mqttx::Client> &mqtt_client
     ) : task_config_(std::move(task_config)), detector_(detector), codec_manager_(codec_manager),
@@ -47,8 +47,6 @@ namespace detectionx {
         detect_thread_ = std::thread(&Pipeline::detect_thread, this);
         process_thread_ = std::thread(&Pipeline::process_thread, this);
 
-        // recorder_.start("runs/" + task_config_.id + ".mp4", video_width_, video_height_, 30);
-
         LOG_INFO("pipeline", "pipeline %s started", task_config_.id.c_str());
         return true;
     }
@@ -73,7 +71,7 @@ namespace detectionx {
                 framex->fd, framex->ptr, framex->width, framex->height, framex->width * 3, framex
             );
 
-            const auto fut = detector_->commit(imagex);
+            const auto fut = detector_->submit(imagex);
             if (!detection_queue_ || !detection_queue_->push({framex, fut}, 10)) {
                 // 队列已 release/close 或异常：直接退出
                 stopped_.store(true, std::memory_order_release);
@@ -110,7 +108,6 @@ namespace detectionx {
                 }
             }
 
-            // recorder_.write(image);
             const auto st = encoder_->write(task.framex, 10);
             if (st != IoStatus::Ok && st != IoStatus::Timeout) {
                 stopped_.store(true);
@@ -243,7 +240,7 @@ namespace detectionx {
 
     std::shared_ptr<Pipeline> Pipeline::create(
         const TaskConfig &task_config,
-        const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults> > &detector,
+        const std::shared_ptr<inferencex::detection::DetectionEngine> &detector,
         const std::shared_ptr<Manager> &codec_manager,
         const std::shared_ptr<rtspx::MediaSession> &rtsp_session,
         const std::shared_ptr<mqttx::Client> &mqtt_client

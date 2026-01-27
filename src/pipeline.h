@@ -6,9 +6,9 @@
 #include <inferencex/types.h>
 #include <toolkitx/vision/region.h>
 #include <toolkitx/concurrent/queuex.h>
+#include <inferencex/engines/detection/detection.h>
 
 #include "config.h"
-#include "video_recoder.h"
 
 namespace detectionx {
     struct DetectionTask {
@@ -20,7 +20,7 @@ namespace detectionx {
     public:
         explicit Pipeline(
             TaskConfig task_config,
-            const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults>>& detector,
+            const std::shared_ptr<inferencex::detection::DetectionEngine>& detector,
             const std::shared_ptr<vcodecx::Manager>& codec_manager,
             const std::shared_ptr<rtspx::MediaSession>& rtsp_session,
             const std::shared_ptr<mqttx::Client>& mqtt_client
@@ -32,7 +32,7 @@ namespace detectionx {
 
         static std::shared_ptr<Pipeline> create(
             const TaskConfig& task_config,
-            const std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults>>& detector,
+            const std::shared_ptr<inferencex::detection::DetectionEngine>& detector,
             const std::shared_ptr<vcodecx::Manager>& codec_manager,
             const std::shared_ptr<rtspx::MediaSession>& rtsp_session,
             const std::shared_ptr<mqttx::Client>& mqtt_client
@@ -53,7 +53,7 @@ namespace detectionx {
 
     private:
         TaskConfig task_config_{};
-        std::shared_ptr<inferencex::InferenceX<inferencex::ImageX, inferencex::Detection2DResults>> detector_{};
+        std::shared_ptr<inferencex::detection::DetectionEngine> detector_{};
         std::shared_ptr<vcodecx::Manager> codec_manager_{};
         std::shared_ptr<rtspx::MediaSession> rtsp_session_{};
         std::shared_ptr<mqttx::Client> mqtt_client_{};
@@ -66,7 +66,6 @@ namespace detectionx {
         int video_height_{};
         std::thread detect_thread_{};
         std::thread process_thread_{};
-        VideoRecorder recorder_{};
         std::shared_ptr<vcodecx::Decoder> decoder_{};
         std::shared_ptr<vcodecx::Encoder> encoder_{};
 
