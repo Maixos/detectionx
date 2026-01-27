@@ -5,7 +5,7 @@ SCRIPT_NAME=$(basename "$0")
 JOBS=$(nproc)
 
 # 默认平台
-TARGET_PLATFORM="rk3588"
+TARGET_PLATFORM="rknn"
 
 usage() {
   echo "Usage:"
@@ -13,8 +13,8 @@ usage() {
   echo "  $SCRIPT_NAME clean"
   echo
   echo "Platforms:"
-  echo "  rk3588 (default)"
-  echo "  jetson"
+  echo "  rknn (default)"
+  echo "  tensorrt"
   exit 1
 }
 
@@ -41,7 +41,7 @@ if [[ $# -eq 1 ]]; then
 fi
 
 case "$TARGET_PLATFORM" in
-  rk3588|jetson)
+  tensorrt|rknn)
     ;;
   *)
     echo "❌ Unsupported platform: $TARGET_PLATFORM"

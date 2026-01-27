@@ -49,11 +49,11 @@ add_subdirectory(src)
 # Tests
 # ============================================================
 if(NOT DEFINED TARGET_PLATFORM)
-    set(TARGET_PLATFORM "rk3588" CACHE STRING "Target platform")
+    set(TARGET_PLATFORM "rknn" CACHE STRING "Target platform")
 endif()
 
-if (TARGET_PLATFORM STREQUAL "rk3588")
-    add_subdirectory(tests/rk3588)
-elseif (TARGET_PLATFORM STREQUAL "jetson")
-    add_subdirectory(tests/jetson)
+if (TARGET_PLATFORM STREQUAL "tensorrt")
+    add_subdirectory(tests/tensorrt)
+elseif (TARGET_PLATFORM STREQUAL "rknn")
+    add_subdirectory(tests/rknn)
 endif ()
